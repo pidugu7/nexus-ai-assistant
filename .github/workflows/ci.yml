@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "arena/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          if (Test-Path package-lock.json) { npm ci } else { npm install }
+        shell: pwsh
+
+      - name: Lint
+        run: npm run lint
+        shell: pwsh
+
+      - name: Typecheck
+        run: npm run typecheck
+        shell: pwsh
+
+      - name: Test
+        run: npm test
+        shell: pwsh
+
+      - name: Build
+        run: npm run build
+        shell: pwsh

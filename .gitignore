@@ -147,3 +147,14 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+# --- NEXUS AI additions (foundation) ---
+# Electron build output
+apps/desktop/out
+apps/desktop/dist
+out
+# Sidecar
+services/sidecar/.venv
+services/sidecar/__pycache__
+services/sidecar/*.egg-info
+# Local data
+data/
