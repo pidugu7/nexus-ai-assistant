@@ -2,9 +2,16 @@ import { contextBridge, ipcRenderer } from "electron";
 import { NEXUS_IPC } from "@nexus/shared";
 
 function getIsPackaged(): boolean {
-  const arg = (process.argv as string[]).find((a) => a.startsWith("--nexus-is-packaged="));
-  if (arg) return arg.split("=")[1] === "true";
-  return false;
+  try {
+    // process.argv is set via additionalArguments
+    const argv: unknown = (process as unknown as { argv?: unknown }).argv;
+    if (!Array.isArray(argv)) return false;
+    const arg = (argv as string[]).find((a) => typeof a === "string" && a.startsWith("--nexus-is-packaged="));
+    if (arg) return arg.split("=")[1] === "true";
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 const isPackaged = getIsPackaged();
@@ -37,8 +44,8 @@ const nexusApi = {
     },
   },
   log: {
-    onEntry: (cb: (entry: { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string }) => void): (() => void) => {
-      const handler = (_: unknown, entry: { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string }) => cb(entry);
+    onEntry: (cb: (entry: { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string; source?: string; type?: string }) => void): (() => void) => {
+      const handler = (_: unknown, entry: { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string; source?: string; type?: string }) => cb(entry);
       ipcRenderer.on(NEXUS_IPC.LOG_ENTRY, handler);
       return () => ipcRenderer.removeListener(NEXUS_IPC.LOG_ENTRY, handler);
     },
@@ -68,6 +75,13 @@ const nexusApi = {
       const handler = () => cb();
       ipcRenderer.on(NEXUS_IPC.DEV_TOGGLE, handler);
       return () => ipcRenderer.removeListener(NEXUS_IPC.DEV_TOGGLE, handler);
+    },
+  },
+  toast: {
+    onToast: (cb: (payload: { message: string; ok: boolean }) => void): (() => void) => {
+      const handler = (_: unknown, payload: { message: string; ok: boolean }) => cb(payload);
+      ipcRenderer.on(NEXUS_IPC.TOAST, handler);
+      return () => ipcRenderer.removeListener(NEXUS_IPC.TOAST, handler);
     },
   },
 };

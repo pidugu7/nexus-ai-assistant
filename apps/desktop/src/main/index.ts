@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, shell, globalShortcut } from "electron";
+import { app, BrowserWindow, ipcMain, screen, shell, globalShortcut } from "electron";
 import { join } from "path";
 import { NEXUS_IPC, windowActionSchema, NexusEventSchema, RENDERER_PUBLISH_ALLOWLIST } from "@nexus/shared";
 import { createMachine, nextState } from "@nexus/shared";
 import { TypedEventBus } from "./eventBus.js";
 import { createFileLogStore } from "./fileLogStore.js";
+import { getClampedWindowBounds } from "./windowBounds.js";
 
 const PROD_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';";
 const DEV_CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws://localhost:* wss://localhost:* http://localhost:* https://localhost:*;";
@@ -25,6 +26,12 @@ async function persistAndBroadcast(event: { id: string; timestamp: string; sourc
   return logEntry;
 }
 
+function sendToast(message: string, ok: boolean) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(NEXUS_IPC.TOAST, { message, ok });
+  }
+}
+
 function handleStateTransition(event: { type: string; payload: unknown; id: string }) {
   const from = machine.getState();
   const res = machine.transition({ type: event.type, payload: event.payload });
@@ -32,9 +39,16 @@ function handleStateTransition(event: { type: string; payload: unknown; id: stri
     const warn = { id: `${Date.now()}-warn`, timestamp: new Date().toISOString(), source: "system" as const, type: "system.warning" as const, payload: { message: res.reason }, level: "warn" as const, message: res.reason };
     bus.publish(warn);
     persistAndBroadcast(warn as never);
+    sendToast(`${event.type}: REJECTED because ${res.reason}`, false);
     return { ok: false as const, reason: res.reason, from };
   }
   const to = res.to;
+  // Kill from idle should not log pointless idle->idle
+  if (from === to && event.type === "system.kill") {
+    persistAndBroadcast({ id: `${Date.now()}-state`, timestamp: new Date().toISOString(), source: "system", type: "log:entry", payload: {}, level: "info", message: "kill: already idle" } as never);
+    sendToast("kill: already idle", true);
+    return { ok: true as const, from, to };
+  }
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(NEXUS_IPC.STATE_CHANGED, { from, to, eventId: event.id });
   const lvl = to === "error" || to === "warning" ? "warn" : "info";
   persistAndBroadcast({ id: `${Date.now()}-state`, timestamp: new Date().toISOString(), source: "system", type: `state:${from}->${to}`, payload: {}, level: lvl, message: `state ${from} → ${to}` } as never);
@@ -84,13 +98,61 @@ function registerIpcHandlers() {
   ipcMain.handle(NEXUS_IPC.BUS_PUBLISH, async (_e, raw) => {
     const isDev = !app.isPackaged;
     const parsed = NexusEventSchema.safeParse(raw);
-    if (!parsed.success) return { ok: false, reason: parsed.error.message };
+    if (!parsed.success) {
+      const reason = parsed.error.issues.map((i) => i.message).join("; ");
+      const rawType = (raw as { type?: string })?.type ?? "event";
+      const entry = { id: `${Date.now()}-rej`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: { reason }, level: "warn" as const, message: `${rawType}: REJECTED because ${reason}` };
+      await logStore.append({ id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type, payload: entry.payload } as never);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+        mainWindow.webContents.send(NEXUS_IPC.TOAST, { message: `${rawType}: REJECTED because ${reason}`, ok: false });
+      }
+      return { ok: false, reason };
+    }
     const ev = parsed.data as unknown as { source: string; type: string };
-    if (!isDev && ev.source === "simulated") return { ok: false, reason: "simulated not allowed in production" };
-    if (ev.source === "simulated" && !RENDERER_PUBLISH_ALLOWLIST.includes(ev.type as never)) return { ok: false, reason: "allowlist" };
+    if (!isDev && ev.source === "simulated") {
+      const reason = "simulated not allowed in production";
+      const entry = { id: `${Date.now()}-rej`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: { reason }, level: "warn" as const, message: `${ev.type}: REJECTED because ${reason}` };
+      await logStore.append({ id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type, payload: entry.payload } as never);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+        mainWindow.webContents.send(NEXUS_IPC.TOAST, { message: `${ev.type}: REJECTED because ${reason}`, ok: false });
+      }
+      return { ok: false, reason };
+    }
+    if (ev.source === "simulated" && !RENDERER_PUBLISH_ALLOWLIST.includes(ev.type as never)) {
+      const reason = `Renderer not allowed to publish ${ev.type}`;
+      const entry = { id: `${Date.now()}-rej`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: { reason }, level: "warn" as const, message: `${ev.type}: REJECTED because ${reason}` };
+      await logStore.append({ id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type, payload: entry.payload } as never);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+        mainWindow.webContents.send(NEXUS_IPC.TOAST, { message: `${ev.type}: REJECTED because ${reason}`, ok: false });
+      }
+      return { ok: false, reason };
+    }
     const res = bus.publish(raw, { fromRenderer: true });
-    if (!res.ok) return { ok: false, reason: res.reason };
+    if (!res.ok) {
+      const reason = res.reason;
+      const entry = { id: `${Date.now()}-rej`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: { reason }, level: "warn" as const, message: `${ev.type}: REJECTED because ${reason}` };
+      await logStore.append({ id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type, payload: entry.payload } as never);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+        mainWindow.webContents.send(NEXUS_IPC.TOAST, { message: `${ev.type}: REJECTED because ${reason}`, ok: false });
+      }
+      return { ok: false, reason };
+    }
+    // Special case: kill from idle should log once, not idle->idle
+    if (res.event.type === "system.kill" && machine.getState() === "idle") {
+      const entry = { id: `${Date.now()}-kill-idle`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: {}, level: "info" as const, message: "kill: already idle" };
+      await logStore.append({ id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type, payload: entry.payload } as never);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+      }
+      sendToast("kill: already idle", true);
+      return { ok: true };
+    }
     await persistAndBroadcast(res.event as never);
+    sendToast(`${res.event.type}: accepted`, true);
     if (nextState(machine.getState(), res.event.type, res.event.payload) !== null || res.event.type === "system.kill" || res.event.type === "error" || res.event.type === "system.warning") {
       handleStateTransition({ type: res.event.type, payload: res.event.payload, id: res.event.id });
     }
@@ -101,8 +163,19 @@ function registerIpcHandlers() {
 function registerKillSwitch() {
   const accelerator = "Ctrl+Alt+Shift+K";
   const ok = globalShortcut.register(accelerator, () => {
+    const from = machine.getState();
     const ev = { id: `${Date.now()}-kill`, timestamp: new Date().toISOString(), source: "system" as const, type: "system.kill" as const, payload: { reason: "kill-switch" } };
     bus.publish(ev);
+    // If already idle, log kill: already idle once, not idle->idle
+    if (from === "idle") {
+      const entry = { id: `${Date.now()}-kill-idle`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: {}, level: "info" as const, message: "kill: already idle" };
+      logStore.append(entry as never);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+        mainWindow.webContents.send(NEXUS_IPC.TOAST, { message: "kill: already idle", ok: true });
+      }
+      return;
+    }
     persistAndBroadcast(ev as never);
     handleStateTransition({ type: ev.type, payload: ev.payload, id: ev.id });
   });
@@ -115,7 +188,6 @@ function registerKillSwitch() {
     type: "log:entry",
     payload: {},
   };
-  // do not double log on reload — persist only once per launch via didBootLog guard below
   if (!didBootLog) {
     logStore.append(entry as never);
   }
@@ -123,9 +195,13 @@ function registerKillSwitch() {
 
 function createWindow() {
   const isDev = !app.isPackaged || !!process.env["ELECTRON_RENDERER_URL"];
+  const workArea = screen.getPrimaryDisplay().workAreaSize;
+  const bounds = getClampedWindowBounds(workArea, { width: 1366, height: 768 }, { width: 1100, height: 680 });
   mainWindow = new BrowserWindow({
-    width: 1366,
-    height: 768,
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
     minWidth: 1100,
     minHeight: 680,
     show: false,
@@ -183,16 +259,13 @@ app.whenReady().then(async () => {
   registerIpcHandlers();
   createWindow();
   registerKillSwitch();
-  // single boot log per launch — fixed duplicate bug (was in both main and renderer)
   if (!didBootLog) {
     didBootLog = true;
     const bootEv = { id: `boot-${Date.now()}`, timestamp: new Date().toISOString(), source: "system" as const, type: "system.warning" as const, payload: { message: "App started" }, level: "info" as const, message: "App started" };
     bus.publish(bootEv);
     await logStore.append({ id: bootEv.id, timestamp: bootEv.timestamp, level: "info", message: "App started", source: "system", type: "system.warning", payload: { message: "App started" } } as never);
   }
-  // forward bus to renderer and handle transitions centrally
   bus.subscribe((ev) => {
-    // error isolation already handled in bus
     if (ev.type === "system.kill" || ev.type === "error" || ev.type.startsWith("voice.") || ev.type.startsWith("llm.") || ev.type.startsWith("tool.") || ev.type.startsWith("permission.") || ev.type.startsWith("task.step.") || ev.type === "system.warning") {
       // state transitions are already done via publish path for renderer; for main-originated kills also
     }

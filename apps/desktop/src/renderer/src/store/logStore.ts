@@ -22,7 +22,7 @@ interface LogState {
 export const useLogStore = create<LogState>((set) => ({
   entries: [],
   collapsed: false,
-  addEntry: (entry) => set((s) => ({ entries: [...s.entries, entry] })),
+  addEntry: (entry) => set((s) => (s.entries.some((e) => e.id === entry.id) ? s : { entries: [...s.entries, entry] })),
   setEntries: (entries) => set({ entries }),
   clearView: () => set({ entries: [] }),
   toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),

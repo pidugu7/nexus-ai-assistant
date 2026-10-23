@@ -21,7 +21,7 @@ export default function App(): JSX.Element {
   const setEntries = useLogStore((s) => s.setEntries);
   const setState = useStateStore((s) => s.setState);
   const [devOpen, setDevOpen] = useState(false);
-  // Reliable dev flag: main decides (!app.isPackaged) and preload exposes before React renders
+  const [toast, setToast] = useState<{ message: string; ok: boolean } | null>(null);
   const isDev = !(window as unknown as { __NEXUS_IS_PACKAGED__?: boolean }).__NEXUS_IS_PACKAGED__;
   const booted = useRef(false);
 
@@ -54,10 +54,19 @@ export default function App(): JSX.Element {
     } else if (nexus?.log?.onEntry) {
       unsubs.push(nexus.log.onEntry((entry) => addEntry(entry as never)));
     }
+    if (nexus?.log?.onEntry) {
+      // Always subscribe to direct log entries (rejected events, kill already idle, etc.)
+      // bus path already covers most, but log path ensures rejected visibles
+      const hasBus = !!(nexus?.bus?.onEvent);
+      if (hasBus) {
+        unsubs.push(nexus.log.onEntry((entry) => addEntry(entry as never)));
+      }
+    }
     if (nexus?.state?.onChanged) {
       unsubs.push(
         nexus.state.onChanged((p) => {
-          setState(p.state as never);
+          // FIX: main sends {from,to,eventId}, not {state}
+          setState((p as unknown as { to: string }).to as never);
           addEntry({
             id: `state-${Date.now()}`,
             timestamp: new Date().toISOString(),
@@ -82,6 +91,16 @@ export default function App(): JSX.Element {
         })
       );
     }
+    // Toast for accepted/rejected visibility
+    const maybeToast = (nexus as unknown as { toast?: { onToast?: (cb: (payload: { message: string; ok: boolean }) => void) => () => void } })?.toast;
+    if (maybeToast?.onToast) {
+      unsubs.push(
+        maybeToast.onToast((payload) => {
+          setToast(payload);
+          window.setTimeout(() => setToast(null), 3000);
+        })
+      );
+    }
     return () => unsubs.forEach((fn) => fn());
   }, [addEntry, setEntries, setState]);
 
@@ -89,8 +108,6 @@ export default function App(): JSX.Element {
     document.documentElement.setAttribute("data-reduced", String(reduced));
   }, [reduced]);
 
-  // Reliable shortcut: main handles Ctrl+Alt+Shift+D via before-input-event (input.code === "KeyD")
-  // and sends DEV_TOGGLE; renderer just toggles. Prevents letter typing into CommandBar.
   useEffect(() => {
     if (!isDev) return;
     const nexus = (window as unknown as { nexus?: { dev?: { onToggle?: (cb: () => void) => () => void } } }).nexus;
@@ -124,6 +141,25 @@ export default function App(): JSX.Element {
       </div>
       <CommandBar />
       <ActivityLog />
+      {toast && (
+        <div
+          data-testid="toast"
+          style={{
+            position: "fixed",
+            bottom: 48,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 70,
+            padding: "6px 12px",
+            borderRadius: 6,
+            fontSize: 11,
+            background: toast.ok ? "rgba(16,185,129,0.95)" : "rgba(239,68,68,0.95)",
+            color: "white",
+          }}
+        >
+          {toast.message}
+        </div>
+      )}
       {isDev && (
         <button
           type="button"
