@@ -99,6 +99,26 @@ const nexusApi = {
       return () => ipcRenderer.removeListener(NEXUS_IPC.TOAST, handler);
     },
   },
+  ollama: {
+    listModels: (): Promise<{ ok: boolean; models?: unknown; error?: string }> => ipcRenderer.invoke(NEXUS_IPC.OLLAMA_LIST_MODELS),
+    chatStream: (payload: { model: string; messages: { role: string; content: string }[]; fastMode?: boolean }): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(NEXUS_IPC.OLLAMA_CHAT_STREAM, payload),
+    onChunk: (cb: (data: { thinking?: string; content?: string; done?: boolean }) => void): (() => void) => {
+      const handler = (_: unknown, data: { thinking?: string; content?: string; done?: boolean }) => cb(data);
+      ipcRenderer.on(NEXUS_IPC.OLLAMA_CHAT_CHUNK, handler);
+      return () => ipcRenderer.removeListener(NEXUS_IPC.OLLAMA_CHAT_CHUNK, handler);
+    },
+    onDone: (cb: () => void): (() => void) => {
+      const handler = () => cb();
+      ipcRenderer.on(NEXUS_IPC.OLLAMA_CHAT_DONE, handler);
+      return () => ipcRenderer.removeListener(NEXUS_IPC.OLLAMA_CHAT_DONE, handler);
+    },
+    onError: (cb: (payload: { message: string }) => void): (() => void) => {
+      const handler = (_: unknown, payload: { message: string }) => cb(payload);
+      ipcRenderer.on(NEXUS_IPC.OLLAMA_CHAT_ERROR, handler);
+      return () => ipcRenderer.removeListener(NEXUS_IPC.OLLAMA_CHAT_ERROR, handler);
+    },
+  },
 };
 
 export type NexusApi = typeof nexusApi;

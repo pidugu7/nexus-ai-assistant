@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { STORAGE_KEYS, setStored } from "../lib/storage.js";
+import { STORAGE_KEYS, setStored, getStored } from "../lib/storage.js";
 
 function getSystemPrefersReduced(): boolean {
   try {
@@ -38,6 +38,15 @@ interface SettingsState {
   fpsOverlay: boolean;
   setFpsOverlay: (v: boolean) => void;
   toggleFpsOverlay: () => void;
+  // --- Ollama settings ---
+  ollamaModel: string;
+  setOllamaModel: (m: string) => void;
+  showReasoning: boolean;
+  setShowReasoning: (v: boolean) => void;
+  toggleShowReasoning: () => void;
+  fastMode: boolean;
+  setFastMode: (v: boolean) => void;
+  toggleFastMode: () => void;
 }
 
 function makeEffectiveAndSource(stored: boolean | null, systemPrefers: boolean) {
@@ -63,10 +72,25 @@ function getInitialFps(): boolean {
   return false;
 }
 
+function getInitialOllamaModel(): string {
+  return getStored<string>(STORAGE_KEYS.OLLAMA_MODEL, "qwen3:8b");
+}
+
+function getInitialShowReasoning(): boolean {
+  return getStored<boolean>(STORAGE_KEYS.SHOW_REASONING, false);
+}
+
+function getInitialFastMode(): boolean {
+  return getStored<boolean>(STORAGE_KEYS.FAST_MODE, false);
+}
+
 const initStored = initialStored();
 const initSystem = getSystemPrefersReduced();
 const initComputed = makeEffectiveAndSource(initStored, initSystem);
 const initFps = getInitialFps();
+const initOllamaModel = getInitialOllamaModel();
+const initShowReasoning = getInitialShowReasoning();
+const initFastMode = getInitialFastMode();
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   storedValue: initStored,
@@ -75,6 +99,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   reducedSource: initComputed.source,
   reducedEffects: initComputed.effective,
   fpsOverlay: initFps,
+  ollamaModel: initOllamaModel,
+  showReasoning: initShowReasoning,
+  fastMode: initFastMode,
   setReducedEffects: (v) => {
     setStored(STORAGE_KEYS.REDUCED_EFFECTS, v);
     const system = get().systemPrefersReduced;
@@ -127,6 +154,30 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // ignore
       }
       return { fpsOverlay: next };
+    }),
+  setOllamaModel: (m) => {
+    setStored(STORAGE_KEYS.OLLAMA_MODEL, m);
+    set({ ollamaModel: m });
+  },
+  setShowReasoning: (v) => {
+    setStored(STORAGE_KEYS.SHOW_REASONING, v);
+    set({ showReasoning: v });
+  },
+  toggleShowReasoning: () =>
+    set((s) => {
+      const next = !s.showReasoning;
+      setStored(STORAGE_KEYS.SHOW_REASONING, next);
+      return { showReasoning: next };
+    }),
+  setFastMode: (v) => {
+    setStored(STORAGE_KEYS.FAST_MODE, v);
+    set({ fastMode: v });
+  },
+  toggleFastMode: () =>
+    set((s) => {
+      const next = !s.fastMode;
+      setStored(STORAGE_KEYS.FAST_MODE, next);
+      return { fastMode: next };
     }),
 }));
 

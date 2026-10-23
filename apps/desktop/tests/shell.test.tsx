@@ -21,10 +21,13 @@ describe("HUD shell — all regions", () => {
     expect(screen.getByLabelText("Minimize")).toBeInTheDocument();
     expect(screen.getByLabelText("Close")).toBeInTheDocument();
 
-    // Top status bar — now shows real state (IDLE etc.) + MODEL NOT CONNECTED
+    // Top status bar — now shows real state (IDLE etc.) + MODEL (qwen3:8b default or NOT CONNECTED when offline)
     expect(screen.getByTestId("statusbar")).toBeInTheDocument();
     expect(screen.getByTestId("status-state")).toBeInTheDocument();
-    expect(screen.getByText("NOT CONNECTED")).toBeInTheDocument();
+    expect(screen.getByTestId("status-model")).toBeInTheDocument();
+    // Honest: either shows default chat model qwen3:8b or NOT CONNECTED depending on Ollama reachability
+    const statusModel = screen.getByTestId("status-model");
+    expect(statusModel.textContent).toMatch(/NOT CONNECTED|qwen3:8b/);
     expect(screen.getByTestId("clock")).toBeInTheDocument();
 
     // Left nav
