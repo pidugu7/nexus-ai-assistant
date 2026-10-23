@@ -16,7 +16,7 @@ import { useStateStore } from "./store/stateStore.js";
 
 export default function App(): JSX.Element {
   const active = useNavStore((s) => s.active);
-  const reduced = useSettingsStore((s) => s.reducedEffects);
+  const reduced = useSettingsStore((s) => s.effectiveReduced);
   const addEntry = useLogStore((s) => s.addEntry);
   const setEntries = useLogStore((s) => s.setEntries);
   const setState = useStateStore((s) => s.setState);
@@ -45,8 +45,6 @@ export default function App(): JSX.Element {
     if (nexus?.bus?.onEvent) {
       unsubs.push(
         nexus.bus.onEvent((ev) => {
-          // TRACE HOP 8
-          try { console.log(`[HOP 8] renderer store: setState / appendLog called with the new value bus ${ev.type} ${ev.message?.slice(0,80) ?? ""}`); } catch (_e) { void _e; }
           addEntry({
             id: ev.id,
             timestamp: ev.timestamp,
@@ -61,26 +59,16 @@ export default function App(): JSX.Element {
     // Always subscribe to log entries for REJECTED/kill:already_idle etc.
     // Use separate subscription to avoid missing rejected events when bus exists
     if (nexus?.log?.onEntry) {
-      unsubs.push(nexus.log.onEntry((entry) => {
-        // TRACE HOP 8
-        try { console.log(`[HOP 8] renderer store: setState / appendLog called with the new value log ${(entry as { type?: string })?.type} ${(entry as { message?: string })?.message?.slice(0,80) ?? ""}`); } catch (_e) { void _e; }
-        addEntry(entry as never);
-      }));
+      unsubs.push(
+        nexus.log.onEntry((entry) => {
+          addEntry(entry as never);
+        })
+      );
     }
     if (nexus?.state?.onChanged) {
       unsubs.push(
         nexus.state.onChanged((p) => {
-          // TRACE HOP 8
-          try { console.log(`[HOP 8] renderer store: setState / appendLog called with the new value state ${p.from} -> ${p.to}`); } catch (_e) { void _e; }
           setState((p as unknown as { to: string }).to as never);
-          addEntry({
-            id: `state-${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            level: "info",
-            message: `state ${p.from} → ${p.to}`,
-            source: "system",
-            type: "state.changed",
-          });
         })
       );
     }

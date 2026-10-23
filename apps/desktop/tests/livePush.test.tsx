@@ -25,10 +25,17 @@ describe("renderer store updates when IPC state message arrives", () => {
 
   it("state changes to listening when main sends STATE_CHANGED", async () => {
     let stateHandler: ((p: { from: string; to: string; eventId: string }) => void) | null = null;
+    let logHandler: ((e: { id: string; timestamp: string; level: string; message: string }) => void) | null = null;
     const mockOnChanged = vi.fn((cb) => {
       stateHandler = cb;
       return () => {
         stateHandler = null;
+      };
+    });
+    const mockOnEntry = vi.fn((cb) => {
+      logHandler = cb;
+      return () => {
+        logHandler = null;
       };
     });
     const mockBus = vi.fn(() => () => {});
@@ -36,7 +43,7 @@ describe("renderer store updates when IPC state message arrives", () => {
     const mockStateGet = vi.fn(() => Promise.resolve({ state: "idle" }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).nexus = {
-      log: { get: mockLogGet, onEntry: vi.fn(() => () => {}), clearView: vi.fn() },
+      log: { get: mockLogGet, onEntry: mockOnEntry, clearView: vi.fn() },
       state: { get: mockStateGet, onChanged: mockOnChanged },
       bus: { onEvent: mockBus, publish: vi.fn(() => Promise.resolve({ ok: true })) },
       system: { onKill: vi.fn(() => () => {}) },
@@ -61,14 +68,16 @@ describe("renderer store updates when IPC state message arrives", () => {
     });
     expect(mockOnChanged.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(useStateStore.getState().state).toBe("idle");
-    // Simulate main sending state change
+    // Simulate main sending state change + log entry (main's persistAndBroadcast for state)
     act(() => {
       stateHandler?.({ from: "idle", to: "listening", eventId: "test-1" });
+      logHandler?.({ id: "state-1", timestamp: new Date().toISOString(), level: "info", message: "state idle → listening" });
     });
     expect(useStateStore.getState().state).toBe("listening");
-    // App also adds log entry for state transition
+    // Log entry for state transition comes from main via LOG_ENTRY, not duplicate via state handler
     const entries = useLogStore.getState().entries;
-    expect(entries.some((e) => e.message.includes("idle → listening"))).toBe(true);
+    const stateEntries = entries.filter((e) => e.message.includes("idle → listening"));
+    expect(stateEntries.length).toBe(1);
   });
 });
 

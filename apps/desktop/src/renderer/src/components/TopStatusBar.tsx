@@ -4,8 +4,6 @@ import { useStateStore } from "../store/stateStore.js";
 export function TopStatusBar() {
   const { time, date } = useClock();
   const coreState = useStateStore((s) => s.state);
-  // TRACE HOP 9
-  try { console.log(`[HOP 9] renderer: the status bar component renders with the state it received ${coreState}`); } catch (_e) { void _e; }
   return (
     <header className="statusbar" data-testid="statusbar">
       <div className="statusbar-left">

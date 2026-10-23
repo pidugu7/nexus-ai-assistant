@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createEvent } from "@nexus/shared";
 import { useStateStore } from "../store/stateStore.js";
-import { useLogStore } from "../store/logStore.js";
 
 declare global {
   interface Window {
@@ -32,11 +31,11 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
   const [walking, setWalking] = useState(false);
   const walkRef = useRef<number | null>(null);
   const state = useStateStore((s) => s.state);
-  const entries = useLogStore((s) => s.entries);
   const [lastStateUpdate, setLastStateUpdate] = useState<string>("never");
   const [clicksSent, setClicksSent] = useState(0);
   const [stateMsgs, setStateMsgs] = useState(0);
   const [logMsgs, setLogMsgs] = useState(0);
+  const [sessionCount, setSessionCount] = useState(0);
   const [lastError, setLastError] = useState<string>("none");
   const prevStateRef = useRef(state);
 
@@ -52,7 +51,7 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
     const unsubs: (() => void)[] = [];
     if (nexus?.state?.onChanged) {
       unsubs.push(
-        nexus.state.onChanged((_p) => {
+        nexus.state.onChanged(() => {
           setLastStateUpdate(new Date().toLocaleTimeString());
           setStateMsgs((c) => c + 1);
         })
@@ -62,6 +61,7 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
       unsubs.push(
         nexus.bus.onEvent(() => {
           setLogMsgs((c) => c + 1);
+          setSessionCount((c) => c + 1);
         })
       );
     }
@@ -70,7 +70,7 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
         nexus.log.onEntry((e) => {
           setLogMsgs((c) => c + 1);
           if (e.level === "warn" || e.level === "error" || e.message.includes("REJECTED")) {
-            setLastError(`${e.message.slice(0,80)} @ ${new Date().toLocaleTimeString()}`);
+            setLastError(`${e.message.slice(0, 80)} @ ${new Date().toLocaleTimeString()}`);
           }
         })
       );
@@ -78,7 +78,7 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
     if (nexus?.toast?.onToast) {
       unsubs.push(
         nexus.toast.onToast((p) => {
-          if (!p.ok) setLastError(`${p.message.slice(0,80)} @ ${new Date().toLocaleTimeString()}`);
+          if (!p.ok) setLastError(`${p.message.slice(0, 80)} @ ${new Date().toLocaleTimeString()}`);
         })
       );
     }
@@ -89,13 +89,13 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
   if (!open) return null;
 
   function publishSim(type: string, payload: unknown) {
-    // TRACE HOP 1
-    console.log(`[HOP 1] renderer: button click handler runs, with the event type ${type}`);
     setClicksSent((c) => c + 1);
     try {
       (window as unknown as { __NEXUS_TRACE_CLICKS?: number }).__NEXUS_TRACE_CLICKS =
         ((window as unknown as { __NEXUS_TRACE_CLICKS?: number }).__NEXUS_TRACE_CLICKS ?? 0) + 1;
-    } catch (_e) { void _e; }
+    } catch (_e) {
+      void _e;
+    }
     const ev = createEvent(type as never, payload, { source: "simulated" });
     const p = window.nexus?.bus?.publish(ev);
     if (p && typeof (p as Promise<unknown>).then === "function") {
@@ -149,9 +149,8 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
       </div>
       <div data-testid="dev-live-indicator" style={{ marginTop: 6, fontSize: 10, lineHeight: 1.4, background: "rgba(0,0,0,0.3)", padding: "4px 6px", borderRadius: 4 }}>
         <div>Last state update received: <span data-testid="dev-last-state-time">{lastStateUpdate}</span> ({state})</div>
-        <div>Events received this session: <span data-testid="dev-event-count">{entries.length}</span></div>
+        <div>Events received this session: <span data-testid="dev-event-count">{sessionCount}</span></div>
       </div>
-      {/* TRACE Diagnostics box - development only */}
       <div data-testid="diagnostics" style={{ marginTop: 6, fontSize: 10, lineHeight: 1.4, background: "rgba(255,193,7,0.08)", border: "1px dashed var(--amber, #f59e0b)", padding: "4px 6px", borderRadius: 4 }}>
         <div style={{ fontWeight: 600 }}>Diagnostics (trace)</div>
         <div>clicks sent: <span data-testid="diag-clicks">{clicksSent}</span></div>

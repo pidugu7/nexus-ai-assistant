@@ -46,9 +46,6 @@ const nexusApi = {
   log: {
     onEntry: (cb: (entry: { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string; source?: string; type?: string }) => void): (() => void) => {
       const handler = (_: unknown, entry: { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string; source?: string; type?: string }) => {
-        // TRACE HOP 7
-        try { console.log(`[HOP 7] preload: a message arrives on the log channel ${NEXUS_IPC.LOG_ENTRY} id=${(entry as { id?: string })?.id} ${(entry as { message?: string })?.message?.slice(0,80) ?? ""}`); } catch (_e) { void _e; }
-        try { console.log(`[HOP 7] preload: a message arrives on the log channel and the renderer callback is invoked`); } catch (_e) { void _e; }
         cb(entry);
       };
       ipcRenderer.on(NEXUS_IPC.LOG_ENTRY, handler);
@@ -60,15 +57,10 @@ const nexusApi = {
   },
   bus: {
     publish: (event: unknown): Promise<{ ok: boolean; reason?: string }> => {
-      // TRACE HOP 2
-      try { console.log(`[HOP 2] preload: the publish IPC call is sent ${(event as { type?: string })?.type ?? String(event).slice(0,80)}`); } catch (_e) { void _e; }
       return ipcRenderer.invoke(NEXUS_IPC.BUS_PUBLISH, event);
     },
     onEvent: (cb: (ev: { id: string; timestamp: string; source: string; type: string; payload: unknown; level?: string; message?: string }) => void): (() => void) => {
       const handler = (_: unknown, ev: never) => {
-        // TRACE HOP 7
-        try { console.log(`[HOP 7] preload: a message arrives on the state channel ${NEXUS_IPC.BUS_SUBSCRIBE} type=${(ev as { type?: string })?.type}`); } catch (_e) { void _e; }
-        try { console.log(`[HOP 7] preload: a message arrives on the log channel and the renderer callback is invoked`); } catch (_e) { void _e; }
         cb(ev as never);
       };
       ipcRenderer.on(NEXUS_IPC.BUS_SUBSCRIBE, handler);
@@ -79,9 +71,6 @@ const nexusApi = {
     get: (): Promise<{ state: string }> => ipcRenderer.invoke(NEXUS_IPC.STATE_GET),
     onChanged: (cb: (p: { from: string; to: string; eventId: string }) => void): (() => void) => {
       const handler = (_: unknown, p: never) => {
-        // TRACE HOP 7
-        try { console.log(`[HOP 7] preload: a message arrives on the state channel ${NEXUS_IPC.STATE_CHANGED} ${JSON.stringify(p).slice(0,120)}`); } catch (_e) { void _e; }
-        try { console.log(`[HOP 7] preload: a message arrives on the state channel and the renderer callback is invoked`); } catch (_e) { void _e; }
         cb(p as never);
       };
       ipcRenderer.on(NEXUS_IPC.STATE_CHANGED, handler);
