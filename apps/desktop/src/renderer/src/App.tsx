@@ -23,20 +23,24 @@ export default function App(): JSX.Element {
   const [devOpen, setDevOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; ok: boolean } | null>(null);
   const isDev = !(window as unknown as { __NEXUS_IS_PACKAGED__?: boolean }).__NEXUS_IS_PACKAGED__;
-  const booted = useRef(false);
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (booted.current) return;
-    booted.current = true;
+    // One-time fetch of initial state/log (guard double fetch in StrictMode)
+    if (!fetchedRef.current) {
+      fetchedRef.current = true;
+      const nexus = (window as unknown as { nexus?: typeof window.nexus }).nexus;
+      if (nexus?.log?.get) {
+        nexus.log.get(200).then((entries) => {
+          if (entries.length > 0) setEntries(entries);
+        });
+      }
+      if (nexus?.state?.get) {
+        nexus.state.get().then((s) => setState(s.state as never));
+      }
+    }
+    // Subscriptions must survive StrictMode double-mount: always subscribe, cleanup on unmount
     const nexus = (window as unknown as { nexus?: typeof window.nexus }).nexus;
-    if (nexus?.log?.get) {
-      nexus.log.get(200).then((entries) => {
-        if (entries.length > 0) setEntries(entries);
-      });
-    }
-    if (nexus?.state?.get) {
-      nexus.state.get().then((s) => setState(s.state as never));
-    }
     const unsubs: (() => void)[] = [];
     if (nexus?.bus?.onEvent) {
       unsubs.push(
@@ -51,21 +55,15 @@ export default function App(): JSX.Element {
           });
         })
       );
-    } else if (nexus?.log?.onEntry) {
-      unsubs.push(nexus.log.onEntry((entry) => addEntry(entry as never)));
     }
+    // Always subscribe to log entries for REJECTED/kill:already_idle etc.
+    // Use separate subscription to avoid missing rejected events when bus exists
     if (nexus?.log?.onEntry) {
-      // Always subscribe to direct log entries (rejected events, kill already idle, etc.)
-      // bus path already covers most, but log path ensures rejected visibles
-      const hasBus = !!(nexus?.bus?.onEvent);
-      if (hasBus) {
-        unsubs.push(nexus.log.onEntry((entry) => addEntry(entry as never)));
-      }
+      unsubs.push(nexus.log.onEntry((entry) => addEntry(entry as never)));
     }
     if (nexus?.state?.onChanged) {
       unsubs.push(
         nexus.state.onChanged((p) => {
-          // FIX: main sends {from,to,eventId}, not {state}
           setState((p as unknown as { to: string }).to as never);
           addEntry({
             id: `state-${Date.now()}`,
@@ -91,7 +89,6 @@ export default function App(): JSX.Element {
         })
       );
     }
-    // Toast for accepted/rejected visibility
     const maybeToast = (nexus as unknown as { toast?: { onToast?: (cb: (payload: { message: string; ok: boolean }) => void) => () => void } })?.toast;
     if (maybeToast?.onToast) {
       unsubs.push(

@@ -1,5 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createEvent } from "@nexus/shared";
+import { useStateStore } from "../store/stateStore.js";
+import { useLogStore } from "../store/logStore.js";
 
 declare global {
   interface Window {
@@ -10,11 +12,9 @@ declare global {
 function publishSim(type: string, payload: unknown) {
   const ev = createEvent(type as never, payload, { source: "simulated" });
   const p = window.nexus?.bus?.publish(ev);
-  // Handle result for immediate toast fallback (main also sends TOAST/LOG for rejected)
   if (p && typeof (p as Promise<unknown>).then === "function") {
     (p as Promise<{ ok: boolean; reason?: string }>).then((res) => {
       if (!res.ok) {
-        // Fallback if main didn't send toast (should already)
         console.warn(`[DEV] ${type}: REJECTED because ${res.reason}`);
       }
     });
@@ -43,6 +43,28 @@ const WALK_SEQUENCE: Array<[string, unknown, string]> = [
 export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [walking, setWalking] = useState(false);
   const walkRef = useRef<number | null>(null);
+  const state = useStateStore((s) => s.state);
+  const entries = useLogStore((s) => s.entries);
+  const [lastStateUpdate, setLastStateUpdate] = useState<string>("never");
+  const prevStateRef = useRef(state);
+
+  useEffect(() => {
+    if (prevStateRef.current !== state) {
+      setLastStateUpdate(new Date().toLocaleTimeString());
+      prevStateRef.current = state;
+    }
+  }, [state]);
+
+  // Also update on any state change via IPC directly for more precise timing
+  useEffect(() => {
+    const nexus = (window as unknown as { nexus?: { state?: { onChanged?: (cb: (p: { from: string; to: string }) => void) => () => void } } }).nexus;
+    if (!nexus?.state?.onChanged) return;
+    const off = nexus.state.onChanged(() => {
+      setLastStateUpdate(new Date().toLocaleTimeString());
+    });
+    return off;
+  }, []);
+
   if (typeof window !== "undefined" && window.__NEXUS_IS_PACKAGED__) return null;
   if (!open) return null;
 
@@ -85,6 +107,10 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
           ✕
         </button>
       </div>
+      <div data-testid="dev-live-indicator" style={{ marginTop: 6, fontSize: 10, lineHeight: 1.4, background: "rgba(0,0,0,0.3)", padding: "4px 6px", borderRadius: 4 }}>
+        <div>Last state update received: <span data-testid="dev-last-state-time">{lastStateUpdate}</span> ({state})</div>
+        <div>Events received this session: <span data-testid="dev-event-count">{entries.length}</span></div>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
         <Btn label="listening" onClick={() => publishSim("voice.listening.started", {})} />
         <Btn label="transcript" onClick={() => publishSim("voice.transcript", { text: "hello nexus", isFinal: true })} />
@@ -119,3 +145,5 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
     </div>
   );
 }
+
+export { WALK_SEQUENCE };
