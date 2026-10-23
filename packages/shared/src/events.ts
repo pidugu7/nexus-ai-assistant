@@ -14,6 +14,10 @@ export type NexusEventMap = {
   "engine:tool-call": { tool: string; input: unknown; permission: number };
   "engine:tool-result": { tool: string; ok: boolean; output?: unknown; error?: string };
   "ui:theme-changed": { theme: "light" | "dark" };
+  "system.kill": { reason: string; timestamp: string };
+  "window:maximized-changed": { isMaximized: boolean };
+  "window:fullscreen-changed": { isFullscreen: boolean };
+  "log:entry": { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string };
 };
 
 // Helper type for typed emitter

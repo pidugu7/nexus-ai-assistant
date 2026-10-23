@@ -1,0 +1,88 @@
+/* NEXUS AI — Design Tokens (CSS variables)
+   Near-black bg, cyan primary, amber warning, red error, luminous 1px borders, glow, spacing/radius, fonts.
+   Fonts are bundled via @fontsource (CSP 'self').
+*/
+:root {
+  --bg: #04070a;
+  --bg-elevated: #0b1217;
+  --bg-panel: #0f1b22;
+  --bg-hover: #13202b;
+
+  --text-primary: #e6f0f5;
+  --text-secondary: #8aa0b0;
+  --text-muted: #5f7383;
+  --text-inverse: #04070a;
+
+  --cyan: #00e5ff;
+  --cyan-dim: #0a8fa3;
+  --cyan-glow: 0 0 10px rgba(0, 229, 255, 0.45), 0 0 22px rgba(0, 229, 255, 0.18);
+  --cyan-border: rgba(0, 229, 255, 0.35);
+
+  --amber: #ffb02e;
+  --amber-dim: #8a5e12;
+  --amber-glow: 0 0 10px rgba(255, 176, 46, 0.35);
+  --amber-border: rgba(255, 176, 46, 0.35);
+
+  --red: #ff3b4a;
+  --red-dim: #7a1620;
+  --red-border: rgba(255, 59, 74, 0.35);
+
+  --border: 1px solid var(--cyan-border);
+  --border-muted: 1px solid rgba(255, 255, 255, 0.08);
+  --border-amber: 1px solid var(--amber-border);
+  --border-red: 1px solid var(--red-border);
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --font-display: "Inter", system-ui, -apple-system, Segoe UI, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --glow-cyan: var(--cyan-glow);
+  --glow-amber: var(--amber-glow);
+
+  --transition-fast: 150ms ease;
+  --transition-panel: 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Reduced effects — disable glows/transitions when [data-reduced="true"] */
+[data-reduced="true"] {
+  --cyan-glow: none;
+  --amber-glow: none;
+}
+[data-reduced="true"] * {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Utilities */
+.glow-cyan {
+  box-shadow: var(--glow-cyan);
+}
+.glow-amber {
+  box-shadow: var(--glow-amber);
+}
+.border-luminous {
+  border: var(--border);
+}
+.text-cyan {
+  color: var(--cyan);
+}
+.text-muted {
+  color: var(--text-muted);
+}
+.font-mono {
+  font-family: var(--font-mono);
+}
+.font-display {
+  font-family: var(--font-display);
+}

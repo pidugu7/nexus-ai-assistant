@@ -9,4 +9,13 @@ export default defineWorkspace([
       environment: "node",
     },
   },
+  {
+    test: {
+      name: "desktop",
+      include: ["apps/desktop/tests/**/*.test.{ts,tsx}"],
+      environment: "jsdom",
+      setupFiles: ["apps/desktop/tests/setup.ts"],
+      globals: true,
+    },
+  },
 ]);
