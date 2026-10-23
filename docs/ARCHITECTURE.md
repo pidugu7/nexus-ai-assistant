@@ -85,16 +85,21 @@ Event flow (example):
 
 ### CSP Policy
 
+**Production (packaged, `app.isPackaged === true`):**
 ```
-default-src 'self';
-script-src 'self';
-style-src 'self' 'unsafe-inline';
-img-src 'self' data:;
-font-src 'self' data:;
-connect-src 'self';
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';
 ```
+- Single source: `packages/shared/src/csp.ts` → `PROD_CSP`, enforced via both `<meta>` in `apps/desktop/src/renderer/index.html` *and* `session.webRequest.onHeadersReceived` header in `apps/desktop/src/main/index.ts`.
 
-Rationale: allow Vite HMR (`connect-src` widened only in dev) and inline styles for React, but no remote scripts, no `unsafe-eval`.
+**Development (`npm run dev`, `ELECTRON_RENDERER_URL` set):**
+```
+default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws://localhost:* wss://localhost:* http://localhost:* https://localhost:*;
+```
+- Defined as `DEV_CSP` in `packages/shared/src/csp.ts` and mirrored in `apps/desktop/electron.vite.config.ts` + `apps/desktop/src/main/index.ts`.
+- Vite dev server injects an inline React Refresh preamble (`'unsafe-inline'` + `'unsafe-eval'`) and HMR over `ws://localhost:*` — strict prod CSP would block them and show a blank dark page with no terminal errors.
+- Dev CSP is applied via `cspPlugin().transformIndexHtml` (replaces meta only when `ctx.server` exists) *and* dev header; prod builds keep the strict meta/Header.
+
+Rationale: keep prod locked (`self` only, no `unsafe-eval`, no remote), but relax **only** in dev to unblock Vite. Never allow `unsafe-eval` or `ws://` in prod.
 
 ---
 
@@ -151,6 +156,8 @@ Rationale: allow Vite HMR (`connect-src` widened only in dev) and inline styles 
 | 12 | **CI** | `windows-latest` runner, `actions/setup-node@v4` with Node 20 LTS, `npm ci` (fallback `npm install` if no lockfile yet), lint/typecheck/test/build in sequence. |
 | 13 | **Paths** | Forward slashes in code/config (Node resolves on Windows). PowerShell examples use `\\` in docs for user copy-paste, but npm scripts stay `/` for cross-platform. |
 | 14 | **No secrets** | `.env.example` only; `.env` remains gitignored via existing `.gitignore`. |
+| 15 | **CSP dev vs prod** | Strict CSP (`PROD_CSP`) in packaged builds (no `unsafe-eval`, no `ws:`). In `npm run dev` dev CSP (`DEV_CSP`) relaxes `script-src` with `'unsafe-inline' 'unsafe-eval'` and `connect-src` with `ws://localhost:* wss://localhost:*` to allow Vite inline React Refresh + HMR. Implemented via `cspPlugin` in `electron.vite.config.ts` (transformIndexHtml only when `ctx.server` exists) and `isDev` header in `src/main/index.ts`. Prod stays strict — see `packages/shared/src/csp.ts`. |
+| 16 | **DevTools** | `win.webContents.openDevTools({ mode: 'detach' })` only when `!app.isPackaged \|\| ELECTRON_RENDERER_URL` (dev). No DevTools in packaged build. |
 
 ---
 
