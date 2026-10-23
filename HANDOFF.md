@@ -1,28 +1,25 @@
-# HANDOFF — Phase 1 → Phase 2
+# HANDOFF — Phase 2 → Phase 3
 
-**Branch:** `arena/5386cded-nexus-ai-assistant` from `main` (Phase 0 merged). Phase 1 HUD shell done.
+Branch `arena/2ed48b09` from `main` (96cdd2e). Spine done: typed bus, state machine, JSONL log.
 
-**What was built:**
-- Frameless window (`frame:false`, `1100×680` min, F11 + IPC `nexus:window:*`), `contextIsolation:on`, `nodeIntegration:off`, `sandbox:on`, prod CSP strict (`PROD_CSP`), dev relaxed (`DEV_CSP` via `cspPlugin`).
-- Kill-switch `Ctrl+Alt+Shift+K` via `globalShortcut`, emits `system.kill` + log, warns if taken.
-- HUD: titlebar (draggable, buttons `no-drag`), top bar (`NEXUS AI`/`OFFLINE (UI ONLY)`/`NOT CONNECTED`/live clock), left nav 8 items (keyboard, active), center `AI CORE (Phase 3)`, right `SYSTEM STATUS` honest `—`/`None`, command bar stub + disabled mic (`Voice arrives in Phase 7`), collapsible log (real entries).
-- Tokens in `tokens.css` (near-black, cyan/amber/red, 1px luminous, glow, spacing, radius, `Inter`/`JetBrains Mono` via `@fontsource` — no CDN). `docs/DESIGN.md` reference.
-- Motion ≤300 ms via `framer-motion`; `Reduced effects` in Settings (`localStorage` try/catch, `data-reduced` disables glow).
-- Responsive grid `200/1fr/280` → 180/240 → 160/220, no overflow at 1366×768 & 1920×1080 (checked via DevTools emulation + min window).
-- Stores: `zustand` (nav, settings, log); libs: `formatClock`, `submitCommand`, `storage`.
-- IPC/events typed in `packages/shared/src/ipc.ts`/`events.ts`, validated (Zod), `contextBridge` only.
-- Tests: `formatClock`, `navStore`, `command`, `settingsPersistence`, `shell.test.tsx` (all regions, no fake numbers). Prod CSP test still passes.
+What was built:
+- Events Zod schemas (`voice.*`, `llm.*`, `tool.*`, `permission.*`, `task.step.*`, `system.*`, `error`) with `id,timestamp,source,payload`; allowlist `RENDERER_PUBLISH_ALLOWLIST`, validated in `TypedEventBus` (unsubscribe, error isolation, bridge `nexus:bus:*`).
+- State machine pure TS `idle→listening→thinking→executing→speaking→awaiting_approval→warning→error`, table in `STATE_MACHINE.md`, illegal → `{ok:false}` + warning, `system.kill`→`idle` from any.
+- `FileLogStore` JSONL `userData/logs/activity.jsonl`, 5 MB rotate, load last 200, `LogStore` interface (SQLite-ready), Clear view only UI.
+- Fixed duplicate `App started` (single `didBootLog` in main, renderer loads from store, `useRef` guard).
+- Status bar shows real `IDLE/...` (MODEL NOT CONNECTED kept).
+- DevPanel `Ctrl+Alt+Shift+D` dev-only, 16 buttons walk all states + illegal → warning, labels `SIMULATED`, guarded by `app.isPackaged`/`__NEXUS_IS_PACKAGED__`.
+- Security: `contextIsolation on`, `sandbox on`, strict prod CSP, dev relaxed via `cspPlugin`, all IPC `packages/shared` Zod + `contextBridge`.
 
-**Deps added (why):**
-- `framer-motion` — declarative panel/log motion ≤300 ms; `zustand` — tiny typed state; `@fontsource/*` — local fonts keep CSP `self`; `@testing-library/react` (dev) — component test.
-
-**To run/build:**
+To run (Windows PowerShell):
 ```powershell
 npm install
 npm run lint; npm run typecheck; npm test; npm run build
-npm run dev  # frameless NEXUS HUD, F11 toggles, DevTools in dev only
+npm run dev  # HUD with IDLE, log SIMULATED dev panel Ctrl+Alt+Shift+D, F11, kill Ctrl+Alt+Shift+K
 ```
 
-**Next (Phase 2):** Tool contract + `nexus:tool:call` permission gate, allowlist `fs.*`, SQLite log, event bus impl. Reuse `NEXUS_IPC`/`NexusEventMap`; center core stays placeholder until Phase 3.
+Next Phase 3: Three.js core.
+- React Three Fiber in center `AI CORE` frame, driven by `state` (idle pulse, listening ring, thinking spin, etc.), no LLM yet, keep bus/state/log.
+- Reuse `stateStore`, `NexusEvent`, glow tokens, reduced-effects.
 
-**Warnings:** `electron` needs download on fresh `main` (we use `ELECTRON_SKIP_BINARY_DOWNLOAD=1` in CI sandbox); window only verifiable on Windows host (we checked build + DevTools emulation).
+Warnings: Electron binary needs `ELECTRON_SKIP_BINARY_DOWNLOAD=1` in sandbox; window not verifiable headless (checked build + jsdom).

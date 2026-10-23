@@ -4,54 +4,51 @@
 
 ---
 
-## IPC Channels (main ↔ renderer) — typed in `packages/shared/src/ipc.ts`
+## Event Schemas — `packages/shared/src/events.ts`
 
-| Channel | Direction | Payload | Description |
-|---------|-----------|---------|-------------|
-| `nexus:ping` | renderer → main (invoke) | `{} → { ok: boolean, message: string }` | Smoke-test (Phase 0). |
-| `nexus:window:minimize` | renderer → main (invoke) | `void → { ok: boolean }` | Custom titlebar minimize. Validated with `windowActionSchema`. |
-| `nexus:window:maximize` | renderer → main (invoke) | `void → { ok: boolean }` | Maximize/restore toggle. |
-| `nexus:window:close` | renderer → main (invoke) | `void → { ok: boolean }` | Close window. |
-| `nexus:window:toggle-fullscreen` | renderer → main (invoke) | `void → { ok: boolean, isFullscreen?: boolean }` | F11 + IPC toggle. |
-| `nexus:window:is-maximized` | renderer → main (invoke) | `void → { isMaximized: boolean }` | Query maximized state for titlebar icon. |
-| `nexus:window:is-fullscreen` | renderer → main (invoke) | `void → { isFullscreen: boolean }` | Query fullscreen. |
-| `nexus:window:maximized-changed` | main → renderer (on) | `{ isMaximized: boolean }` | Broadcast maximize/unmaximize. |
-| `nexus:window:fullscreen-changed` | main → renderer (on) | `{ isFullscreen: boolean }` | Broadcast fullscreen. |
-| `nexus:system:kill` | main → renderer (on) | `{ reason: string, timestamp: string }` | Kill-switch Ctrl+Alt+Shift+K. |
-| `nexus:log:entry` | main → renderer (on) | `LogEntry { id, timestamp, level, message }` | Real app logs. |
-| `nexus:tool:call` | renderer → main (invoke, future) | `{ tool: string, input: unknown } → { ok, output? }` | LLM tool proposals (Phase 2+). |
+Every event has `id`, `timestamp`, `source: "user"|"model"|"system"|"simulated"`, `type`, `payload` (zod-validated). Simulated only via dev panel, dev only, labelled SIMULATED.
 
-All `invoke` payloads validated with Zod in `apps/desktop/src/main` (`windowActionSchema`). Only exposed via `preload/contextBridge` (`window.nexus.window.*`, `window.nexus.system.*`, `window.nexus.log.*`).
+| Type | Payload |
+|------|---------|
+| `voice.listening.started` | `{ reason? }` |
+| `voice.listening.stopped` | `{ durationMs? }` |
+| `voice.transcript` | `{ text, isFinal }` |
+| `llm.thinking` | `{ prompt? }` |
+| `llm.token` | `{ token }` |
+| `llm.done` | `{ text }` |
+| `llm.error` | `{ message }` |
+| `tool.started` | `{ tool, input }` |
+| `tool.finished` | `{ tool, output }` |
+| `tool.failed` | `{ tool, error }` |
+| `permission.requested` | `{ tool, permission, input }` |
+| `permission.resolved` | `{ tool, granted, actor }` |
+| `task.step.started` | `{ step, title? }` |
+| `task.step.finished` | `{ step, result? }` |
+| `task.step.failed` | `{ step, error }` |
+| `system.kill` | `{ reason }` |
+| `system.warning` | `{ message, code? }` |
+| `error` | `{ message, stack?, code? }` |
 
----
+Validation: `NexusEventSchema` checks `source` enum, `type` enum, and per-type payload. Bad payloads rejected (`ok:false`).
 
-## Event Bus (typed) — `packages/shared/src/events.ts` (`NexusEventMap`)
+## IPC Channels — `packages/shared/src/ipc.ts`
 
-```ts
-export type NexusEventMap = {
-  "engine:status": { state: "idle" | "ready" | "busy" | "error"; message?: string };
-  "engine:tool-call": { tool: string; input: unknown; permission: number };
-  "engine:tool-result": { tool: string; ok: boolean; output?: unknown; error?: string };
-  "ui:theme-changed": { theme: "light" | "dark" };
-  "system.kill": { reason: string; timestamp: string };           // Phase 1: kill-switch
-  "window:maximized-changed": { isMaximized: boolean };          // Phase 1: titlebar sync
-  "window:fullscreen-changed": { isFullscreen: boolean };         // Phase 1: F11 sync
-  "log:entry": { id: string; timestamp: string; level: "info"|"warn"|"error"; message: string }; // Phase 1: activity log
-};
-```
+| Channel | Direction | Payload |
+|---------|-----------|---------|
+| `nexus:bus:publish` | renderer → main (invoke) | `NexusEvent → { ok, reason? }` validated, allowlisted only (`RENDERER_PUBLISH_ALLOWLIST`), simulated only in dev |
+| `nexus:bus:event` | main → renderer (on) | `NexusEvent` (all bus events) |
+| `nexus:state:get` | renderer → main (invoke) | `→ { state }` |
+| `nexus:state:changed` | main → renderer (on) | `{ from, to, eventId }` |
+| `nexus:log:get` | renderer → main (invoke) | `{ count? } → LogEntry[]` |
+| `nexus:log:clear-view` | renderer → main (invoke) | `→ { ok }` (UI clear only, file kept) |
+| `nexus:window:*` | renderer ↔ main | (Phase 1, validated `windowActionSchema`) |
+| `nexus:log:entry` | main → renderer (on) | `LogEntry` (compat, now via `nexus:bus:event`) |
+| `nexus:system:kill` | main → renderer (on) | `{ reason, timestamp }` (compat) |
 
-- UI visuals driven only by real events, never fake data (see `AGENTS.md` §2). Right panel is honest: CPU/GPU/RAM/NETWORK show `—` until Phase 4 telemetry.
-- Preload re-emits main IPC as typed bus events; renderer subscribes via `window.nexus`.
+All `invoke` payloads validated with Zod, exposed only via `preload/contextBridge` (`window.nexus.bus`, `window.nexus.state`, `window.nexus.log`). One bad subscriber never breaks others (try/catch per handler).
 
----
+## State Machine
 
-## Adding a New Event
+States `idle|listening|thinking|executing|speaking|awaiting_approval|warning|error` in `packages/shared/src/stateMachine.ts`. Transition table in `docs/STATE_MACHINE.md`. Illegal `→ reject { ok:false }` + warning log, `system.kill` → `idle` from any.
 
-1. Add entry to `NexusEventMap` in `packages/shared/src/events.ts` and/or `NEXUS_IPC` in `packages/shared/src/ipc.ts`.
-2. Document it here.
-3. Validate with Zod in main, expose only via `contextBridge`.
-4. Renderer subscribes with typed handler — never inline string names.
-
----
-
-*Last updated: Phase 1 — 2026-10-22.*
+*Last updated: Phase 2 — 2026-10-23.*

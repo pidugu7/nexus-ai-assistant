@@ -1,12 +1,16 @@
 import { useClock } from "../hooks/useClock.js";
+import { useStateStore } from "../store/stateStore.js";
 
 export function TopStatusBar() {
   const { time, date } = useClock();
+  const coreState = useStateStore((s) => s.state);
   return (
     <header className="statusbar" data-testid="statusbar">
       <div className="statusbar-left">
         <span className="status-label">NEXUS AI</span>
-        <span className="status-pill status-offline">OFFLINE (UI ONLY)</span>
+        <span className="status-pill status-offline" data-testid="status-state">
+          {coreState.toUpperCase()}
+        </span>
       </div>
       <div className="statusbar-center">
         <span className="status-model">

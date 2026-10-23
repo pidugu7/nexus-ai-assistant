@@ -3,11 +3,9 @@ import { useLogStore } from "../store/logStore.js";
 import { useSettingsStore } from "../store/settingsStore.js";
 
 export function ActivityLog() {
-  const { entries, collapsed, toggleCollapsed } = useLogStore();
+  const { entries, collapsed, toggleCollapsed, clearView } = useLogStore();
   const reduced = useSettingsStore((s) => s.reducedEffects);
-
   const transition = reduced ? { duration: 0 } : { duration: 0.25, ease: "easeInOut" as const };
-
   return (
     <section className="activitylog" data-testid="activity-log">
       <div className="log-header">
@@ -16,6 +14,12 @@ export function ActivityLog() {
         <button className="log-toggle" onClick={toggleCollapsed} aria-expanded={!collapsed} type="button">
           {collapsed ? "Expand" : "Collapse"}
         </button>
+        <button className="log-toggle" onClick={clearView} type="button" data-testid="log-clear">
+          Clear view
+        </button>
+        <span className="text-muted" style={{ fontSize: 10, marginLeft: 8 }}>
+          file kept on disk
+        </span>
       </div>
       <AnimatePresence initial={false}>
         {!collapsed && (
@@ -34,7 +38,12 @@ export function ActivityLog() {
               entries.map((e) => (
                 <div key={e.id} className={`log-entry log-${e.level}`}>
                   <span className="log-time font-mono">{new Date(e.timestamp).toLocaleTimeString()}</span>
-                  <span className="log-msg">{e.message}</span>
+                  {e.source && (
+                    <span className="log-badge" style={e.source === "simulated" ? { color: "var(--amber)" } : undefined}>
+                      {e.source === "simulated" ? "SIMULATED" : e.source.toUpperCase()}
+                    </span>
+                  )}
+                  <span className={`log-msg ${e.source === "simulated" ? "text-muted" : ""}`}>{e.message}</span>
                 </div>
               ))
             )}

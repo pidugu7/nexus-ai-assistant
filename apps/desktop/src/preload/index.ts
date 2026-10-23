@@ -1,22 +1,15 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { NEXUS_IPC } from "@nexus/shared";
 
-// Secure preload — expose only typed, validated channels
-// Renderer never gets Node or Electron APIs directly.
-
 const nexusApi = {
   ping: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke("nexus:ping"),
-
   window: {
     minimize: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(NEXUS_IPC.WINDOW_MINIMIZE),
     maximize: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(NEXUS_IPC.WINDOW_MAXIMIZE),
     close: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(NEXUS_IPC.WINDOW_CLOSE),
-    toggleFullscreen: (): Promise<{ ok: boolean; isFullscreen?: boolean }> =>
-      ipcRenderer.invoke(NEXUS_IPC.WINDOW_TOGGLE_FULLSCREEN),
-    isMaximized: (): Promise<{ isMaximized: boolean }> =>
-      ipcRenderer.invoke(NEXUS_IPC.WINDOW_IS_MAXIMIZED),
-    isFullscreen: (): Promise<{ isFullscreen: boolean }> =>
-      ipcRenderer.invoke(NEXUS_IPC.WINDOW_IS_FULLSCREEN),
+    toggleFullscreen: (): Promise<{ ok: boolean; isFullscreen?: boolean }> => ipcRenderer.invoke(NEXUS_IPC.WINDOW_TOGGLE_FULLSCREEN),
+    isMaximized: (): Promise<{ isMaximized: boolean }> => ipcRenderer.invoke(NEXUS_IPC.WINDOW_IS_MAXIMIZED),
+    isFullscreen: (): Promise<{ isFullscreen: boolean }> => ipcRenderer.invoke(NEXUS_IPC.WINDOW_IS_FULLSCREEN),
     onMaximizedChanged: (cb: (val: { isMaximized: boolean }) => void): (() => void) => {
       const handler = (_: unknown, val: { isMaximized: boolean }) => cb(val);
       ipcRenderer.on(NEXUS_IPC.WINDOW_ON_MAXIMIZED_CHANGED, handler);
@@ -28,7 +21,6 @@ const nexusApi = {
       return () => ipcRenderer.removeListener(NEXUS_IPC.WINDOW_ON_FULLSCREEN_CHANGED, handler);
     },
   },
-
   system: {
     onKill: (cb: (payload: { reason: string; timestamp: string }) => void): (() => void) => {
       const handler = (_: unknown, payload: { reason: string; timestamp: string }) => cb(payload);
@@ -36,17 +28,30 @@ const nexusApi = {
       return () => ipcRenderer.removeListener(NEXUS_IPC.SYSTEM_KILL, handler);
     },
   },
-
   log: {
-    onEntry: (
-      cb: (entry: { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string }) => void
-    ): (() => void) => {
-      const handler = (
-        _: unknown,
-        entry: { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string }
-      ) => cb(entry);
+    onEntry: (cb: (entry: { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string }) => void): (() => void) => {
+      const handler = (_: unknown, entry: { id: string; timestamp: string; level: "info" | "warn" | "error"; message: string }) => cb(entry);
       ipcRenderer.on(NEXUS_IPC.LOG_ENTRY, handler);
       return () => ipcRenderer.removeListener(NEXUS_IPC.LOG_ENTRY, handler);
+    },
+    get: (count?: number): Promise<{ id: string; timestamp: string; level: "info" | "warn" | "error"; message: string; source?: string; type?: string }[]> =>
+      ipcRenderer.invoke(NEXUS_IPC.LOG_GET, { count }),
+    clearView: (): Promise<{ ok: true }> => ipcRenderer.invoke(NEXUS_IPC.LOG_CLEAR_VIEW),
+  },
+  bus: {
+    publish: (event: unknown): Promise<{ ok: boolean; reason?: string }> => ipcRenderer.invoke(NEXUS_IPC.BUS_PUBLISH, event),
+    onEvent: (cb: (ev: { id: string; timestamp: string; source: string; type: string; payload: unknown; level?: string; message?: string }) => void): (() => void) => {
+      const handler = (_: unknown, ev: never) => cb(ev as never);
+      ipcRenderer.on(NEXUS_IPC.BUS_SUBSCRIBE, handler);
+      return () => ipcRenderer.removeListener(NEXUS_IPC.BUS_SUBSCRIBE, handler);
+    },
+  },
+  state: {
+    get: (): Promise<{ state: string }> => ipcRenderer.invoke(NEXUS_IPC.STATE_GET),
+    onChanged: (cb: (p: { from: string; to: string; eventId: string }) => void): (() => void) => {
+      const handler = (_: unknown, p: never) => cb(p as never);
+      ipcRenderer.on(NEXUS_IPC.STATE_CHANGED, handler);
+      return () => ipcRenderer.removeListener(NEXUS_IPC.STATE_CHANGED, handler);
     },
   },
 };
@@ -55,6 +60,7 @@ export type NexusApi = typeof nexusApi;
 
 try {
   contextBridge.exposeInMainWorld("nexus", nexusApi);
+  contextBridge.exposeInMainWorld("__NEXUS_IS_PACKAGED__", false);
 } catch (err) {
   console.error("[preload] failed to expose nexus api", err);
 }
