@@ -35,9 +35,11 @@ describe("HUD shell — all regions", () => {
     // active highlight defaults to Home
     expect(screen.getByTestId("nav-home")).toHaveAttribute("aria-selected","true");
 
-    // Center AI core placeholder
+    // Center AI core (3D canvas or fallback)
     expect(screen.getByTestId("center-core")).toBeInTheDocument();
-    expect(screen.getByText("AI CORE (Phase 3)")).toBeInTheDocument();
+    // either 3D canvas or 2D fallback must be present
+    expect(screen.getByTestId("center-core").textContent).toMatch(/State:/);
+    expect(document.body.querySelector('[data-testid="core-canvas-wrap"], [data-testid="core-canvas"], [data-testid="fallback-core"]')).toBeInTheDocument();
 
     // Right panel — honest UI: — and None, no fake numbers
     expect(screen.getByTestId("right-panel")).toBeInTheDocument();

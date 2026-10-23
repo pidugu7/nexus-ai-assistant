@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createEvent } from "@nexus/shared";
 import { useStateStore } from "../store/stateStore.js";
+import { useAudioStore } from "../store/audioStore.js";
 
 declare global {
   interface Window {
@@ -37,6 +38,8 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
   const [logMsgs, setLogMsgs] = useState(0);
   const [sessionCount, setSessionCount] = useState(0);
   const [lastError, setLastError] = useState<string>("none");
+  const audioLevel = useAudioStore((s) => s.audioLevel);
+  const setAudioLevel = useAudioStore((s) => s.setAudioLevel);
   const prevStateRef = useRef(state);
 
   useEffect(() => {
@@ -177,7 +180,22 @@ export function DevPanel({ open, onClose }: { open: boolean; onClose: () => void
         <Btn label="kill" onClick={() => publishSim("system.kill", { reason: "dev kill" })} />
         <Btn label="illegal" onClick={() => publishSim("llm.token", { token: "illegal from idle" })} />
       </div>
-      <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
+      <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 8 }}>
+          <span>SIMULATED audio level</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={audioLevel}
+            onChange={(e) => setAudioLevel(parseFloat(e.target.value), true)}
+            data-testid="audio-level-slider"
+            style={{ flex: 1 }}
+          />
+          <span data-testid="audio-level-value" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, minWidth: 30 }}>{audioLevel.toFixed(2)}</span>
+        </label>
+        {audioLevel > 0 && <div data-testid="simulated-level-label" style={{ fontSize: 10, color: "var(--amber, #ffb02e)", textAlign: "center" }}>SIMULATED LEVEL</div>}
         <button
           type="button"
           data-testid="dev-walk-all"

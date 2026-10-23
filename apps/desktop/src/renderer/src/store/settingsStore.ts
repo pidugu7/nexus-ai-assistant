@@ -35,6 +35,9 @@ interface SettingsState {
   setFollowSystem: (follow: boolean) => void;
   toggleReducedEffects: () => void;
   refreshSystemPrefers: () => void;
+  fpsOverlay: boolean;
+  setFpsOverlay: (v: boolean) => void;
+  toggleFpsOverlay: () => void;
 }
 
 function makeEffectiveAndSource(stored: boolean | null, systemPrefers: boolean) {
@@ -50,9 +53,20 @@ function makeEffectiveAndSource(stored: boolean | null, systemPrefers: boolean) 
   return { effective, source };
 }
 
+function getInitialFps(): boolean {
+  try {
+    const raw = localStorage.getItem("nexus:fps-overlay");
+    if (raw !== null) return JSON.parse(raw) as boolean;
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
 const initStored = initialStored();
 const initSystem = getSystemPrefersReduced();
 const initComputed = makeEffectiveAndSource(initStored, initSystem);
+const initFps = getInitialFps();
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   storedValue: initStored,
@@ -60,6 +74,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   effectiveReduced: initComputed.effective,
   reducedSource: initComputed.source,
   reducedEffects: initComputed.effective,
+  fpsOverlay: initFps,
   setReducedEffects: (v) => {
     setStored(STORAGE_KEYS.REDUCED_EFFECTS, v);
     const system = get().systemPrefersReduced;
@@ -95,6 +110,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       set({ systemPrefersReduced: system });
     }
   },
+  setFpsOverlay: (v) => {
+    try {
+      localStorage.setItem("nexus:fps-overlay", JSON.stringify(v));
+    } catch {
+      // ignore
+    }
+    set({ fpsOverlay: v });
+  },
+  toggleFpsOverlay: () =>
+    set((s) => {
+      const next = !s.fpsOverlay;
+      try {
+        localStorage.setItem("nexus:fps-overlay", JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return { fpsOverlay: next };
+    }),
 }));
 
 // Listen to OS preference changes when following system

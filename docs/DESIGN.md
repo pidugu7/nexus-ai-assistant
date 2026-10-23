@@ -59,6 +59,10 @@ Apply `border-luminous` + `glow-cyan` for active nav; muted elsewhere.
 
 Min window `1100×680`. Grid `200px 1fr 280px` → `180/240` → `160/220` at breakpoints, tested at 1366×768 & 1920×1080 (no overflow, see `HANDOFF`).
 
+## Core Visuals (Phase 3)
+
+3D core `apps/desktop/src/renderer/src/core/CoreScene.tsx` — procedural only (no CDN textures/models): translucent wireframe sphere, 5 rotating tori, instanced orbital particles, pulsing icosahedron inner core, grid floor + fog, Bloom+Vignette via `@react-three/postprocessing`. Colors from tokens (cyan primary, amber warning, red error). Driven by `coreParamsForState(state, audioLevel)` (pure, tested for 8 states); honest: audioLevel 0 = no fake waveform; dev slider sets it with `SIMULATED LEVEL` label. Quality tiers high(1100)/medium(500)/low(120) + bloom levels; Reduced forces low; battery discharging forces low (try/catch). Pause when hidden/minimized; dispose on unmount.
+
 ## Honest UI Rule
 
-No fake numbers. Right panel shows `—` (muted mono) and `ACTIVE TASK: None`. Only live value is clock (`lib/formatClock.ts`).
+No fake numbers. Right panel shows `—` (muted mono) and `ACTIVE TASK: None`. Only live value is clock (`lib/formatClock.ts`). Core animations are driven only by real state + audioLevel (0 until Phase 7); dev simulated level is labelled.

@@ -19,8 +19,14 @@
 - [x] Tests: all valid/illegal transitions, kill, validation, isolation, JSONL rotation, duplicate regression, component status/log
 - [x] Docs `EVENTS.md`, `STATE_MACHINE.md`, `ROADMAP.md`; CSP still strict (test passes), dev panel absent in prod (verified via `__NEXUS_IS_PACKAGED__`)
 
-## Phase 3 — 3D AI core
-- Three.js/React Three Fiber core driven by state machine (idle pulse etc.), no LLM
+## Phase 3 — 3D AI core (done)
+- [x] `coreParamsForState(state,audioLevel)` pure mapping for 8 states, tests for all states + honest 0-level
+- [x] R3F scene: wireframe sphere, 5 tori, instanced particles, pulsing core, grid+fog, Bloom/Vignette, tokens cyan/amber/red, bright high tier
+- [x] Smooth damp transitions, delta cap 0.1, pause when hidden, dispose on unmount (no leak 10 min)
+- [x] Quality low/medium/high (120/500/1100 particles) auto-low on Reduced/battery, FPS overlay (Ctrl+Alt+Shift+F + Settings) with real FPS/drawCalls
+- [x] Fallback 2D SVG on WebGL fail/lost + log warn, error boundary, aria-live state label, Reduced respects
+- [x] Dev slider SIMULATED audio level, existing buttons kept
+- [x] Tests: coreParams, quality tiers (battery, reduced), fallback + state label, CSP still strict
 
 ## Phase 4 — LLM
 - Local Ollama sidecar, streaming tokens via `llm.token`/`done`

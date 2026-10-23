@@ -22,4 +22,6 @@ export function setStored<T>(key: string, value: T): void {
 
 export const STORAGE_KEYS = {
   REDUCED_EFFECTS: "nexus:reduced-effects",
+  QUALITY: "nexus:quality",
+  FPS_OVERLAY: "nexus:fps-overlay",
 } as const;

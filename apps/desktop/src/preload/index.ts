@@ -85,6 +85,13 @@ const nexusApi = {
       return () => ipcRenderer.removeListener(NEXUS_IPC.DEV_TOGGLE, handler);
     },
   },
+  fps: {
+    onToggle: (cb: () => void): (() => void) => {
+      const handler = () => cb();
+      ipcRenderer.on(NEXUS_IPC.FPS_TOGGLE, handler);
+      return () => ipcRenderer.removeListener(NEXUS_IPC.FPS_TOGGLE, handler);
+    },
+  },
   toast: {
     onToast: (cb: (payload: { message: string; ok: boolean }) => void): (() => void) => {
       const handler = (_: unknown, payload: { message: string; ok: boolean }) => cb(payload);

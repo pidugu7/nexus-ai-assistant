@@ -1,32 +1,25 @@
-# HANDOFF — Phase 2 CLEANUP → Phase 3
+# HANDOFF — Phase 3 → Phase 4 (LLM provider layer)
 
-Branch `arena/2ed48b09-nexus-ai-assistant` from `main` (96cdd2e). Spine + live push + cleanup done.
+Branch `arena/50354b4e-nexus-ai-assistant` from `main` (aea9ede). Phase 3 done: 3D core.
 
 What was built:
-- Events Zod schemas (`voice.*`, `llm.*`, `tool.*`, `permission.*`, `task.step.*`, `system.*`, `error`) with `id,timestamp,source,payload`; allowlist `RENDERER_PUBLISH_ALLOWLIST`, validated in `TypedEventBus` (unsubscribe, error isolation, bridge `nexus:bus:*`).
-- State machine pure TS `idle→listening→thinking→executing→speaking→awaiting_approval→warning→error`, table in `STATE_MACHINE.md`, illegal → `{ok:false}` + warning, `system.kill`→`idle` from any.
-- `FileLogStore` JSONL `userData/logs/activity.jsonl`, 5 MB rotate, load last 200 (`slice(-200)` keeps newest), `LogStore` interface (SQLite-ready), Clear view only UI, auto-scroll to bottom.
-- Fixed duplicate `App started` (single `didBootLog` in main, renderer loads from store, `useRef` guard).
-- **Fixed duplicate state log**: main `persistAndBroadcast` for `state idle → listening` + renderer `state.onChanged` both emitted. Now renderer only `setState`, main is single source via `LOG_ENTRY`. Regression test: one valid event → exactly one `state idle → listening` entry.
-- **Fixed DevPanel counter**: `Events received this session` now counts live `bus.onEvent` since launch (sessionCount), not `entries.length` (history 200). Regression test proves history 200 → count 0, live 2 → count 2. Diagnostics box kept dev-only (`data-testid="diagnostics"` with clicks/state/log/lastError).
-- **Reduced effects**: default OFF. Store now tracks `storedValue` (`boolean | null` where `null` = follow system), `effectiveReduced`, `reducedSource` (`default`/`stored`/`system`), `systemPrefersReduced` via `matchMedia('(prefers-reduced-motion: reduce)')`. `data-reduced` set from `effectiveReduced`. Settings shows source + OS preference + “Following system setting” label and “Follow system setting” toggle to override. Why `data-reduced="true"` is on is visible in Settings (source + system value).
-- Status bar shows real `IDLE/...` (MODEL NOT CONNECTED kept).
-- DevPanel `Ctrl+Alt+Shift+D` dev-only, 16 buttons + “Walk all states” (1.2s interval), labels `SIMULATED`, guarded by `app.isPackaged`/`__NEXUS_IS_PACKAGED__`. Kept DEV button and shortcut. Temporary `[HOP n]` tracing removed from renderer/preload/main; diagnostics kept dev-only, round-trip test kept.
-- Security: `contextIsolation on`, `sandbox on`, strict prod CSP, dev relaxed via `cspPlugin`, all IPC `packages/shared` Zod + `contextBridge`.
+- `coreParamsForState(state,audioLevel)` pure mapping for 8 states, honest: 0 = no fake waveform, tests for all
+- R3F core: wireframe sphere, 5 tori, InstancedMesh particles, pulse core, grid+fog, Bloom+Vignette (postprocessing 6.36.3), bright cyan high tier, tokens cyan/amber/red
+- Smooth damp + delta cap 0.1, pause when hidden, dispose on unmount
+- Quality high(1100)/med(500)/low(120) auto-low on Reduced/battery(dis charging), DPS by tier; FPS overlay real FPS/drawCalls via Ctrl+Alt+Shift+F (main before-input-event KeyF) + Settings toggle
+- Fallback 2D SVG on WebGL fail/lost + log warn, error boundary, aria-live State label, Reduced removes flicker
+- AudioStore audioLevel 0 default, dev-only slider SIMULATED audio level + SIMULATED LEVEL label, kept Walk all states/DEV/Ctrl+Alt+Shift+D
+- Security unchanged (contextIsolation on, sandbox on, prod CSP strict no unsafe-eval), no CDN/procedural only
 
-To run (Windows PowerShell):
+To run (PowerShell):
 ```powershell
 npm install
 npm run lint; npm run typecheck; npm test; npm run build
-npm run dev  # HUD with IDLE, log SIMULATED, dev panel Ctrl+Alt+Shift+D, F11, kill Ctrl+Alt+Shift+K
+npm run dev  # walk dev panel, test quality/FPS, reduced
 ```
 
-Next Phase 3: Three.js core.
-- React Three Fiber in center `AI CORE` frame, driven by `state` (idle pulse, listening ring, thinking spin, etc.), no LLM yet, keep bus/state/log.
-- Reuse `stateStore`, `NexusEvent`, glow tokens, reduced-effects (`data-reduced`).
+Next Phase 4: LLM provider layer (Ollama sidecar, streaming `llm.token`/`done` → state thinking→executing→speaking, no tools).
 
-Warnings: Electron binary needs `ELECTRON_SKIP_BINARY_DOWNLOAD=1` in sandbox; window not verifiable headless (checked build + jsdom + `data-reduced` attribute).
+Warnings: Electron binary needs `ELECTRON_SKIP_BINARY_DOWNLOAD=1`; FPS on RTX 4060 not measured in sandbox (jsdom), report real.
 
-Could not verify: real Electron window rendering and OS `prefers-reduced-motion` live toggle (requires manual Settings check: open Settings → see Source line and “Following system setting” label, toggle “Follow system setting”).
-
-Exact branch to pull: `arena/2ed48b09-nexus-ai-assistant` (tip 937b4ab → new).
+Exact branch: `arena/50354b4e-nexus-ai-assistant`
