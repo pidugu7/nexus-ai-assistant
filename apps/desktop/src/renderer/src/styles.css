@@ -1,0 +1,35 @@
+:root {
+  --bg: #0a0a0f;
+  --fg: #e6e6eb;
+  --accent: #5b8def;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-root {
+  text-align: center;
+}
+
+.app-root h1 {
+  font-size: 2rem;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.app-root p {
+  opacity: 0.8;
+}

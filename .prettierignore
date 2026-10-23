@@ -1,0 +1,8 @@
+node_modules
+out
+dist
+coverage
+apps/desktop/out
+apps/desktop/dist
+pnpm-lock.yaml
+package-lock.json

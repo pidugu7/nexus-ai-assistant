@@ -1,0 +1,27 @@
+{
+  "name": "@nexus/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NEXUS AI desktop — Electron + React + Vite",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^30.5.0",
+    "electron-vite": "^2.3.0",
+    "vite": "^5.3.3"
+  }
+}

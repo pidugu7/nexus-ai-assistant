@@ -1,0 +1,8 @@
+node_modules
+out
+dist
+coverage
+.nyc_output
+apps/desktop/out
+apps/desktop/dist
+services/sidecar/venv
