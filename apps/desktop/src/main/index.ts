@@ -140,6 +140,7 @@ function createWindow() {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
+      additionalArguments: [`--nexus-is-packaged=${app.isPackaged}`],
     },
   });
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, cb) =>
@@ -164,9 +165,9 @@ function createWindow() {
       event.preventDefault();
       if (mainWindow) mainWindow.setFullScreen(!mainWindow.isFullScreen());
     }
-    if (input.key.toLowerCase() === "d" && input.control && input.alt && input.shift && input.type === "keyDown") {
+    if (input.code === "KeyD" && input.control && input.alt && input.shift && input.type === "keyDown") {
       event.preventDefault();
-      // dev panel toggle is handled in renderer; main just needs to allow
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(NEXUS_IPC.DEV_TOGGLE);
     }
   });
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -175,9 +176,6 @@ function createWindow() {
   });
   if (process.env["ELECTRON_RENDERER_URL"]) mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   else mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
-  mainWindow.webContents.on("did-finish-load", () => {
-    mainWindow?.webContents.executeJavaScript(`window.__NEXUS_IS_PACKAGED__=${app.isPackaged};`);
-  });
 }
 
 app.whenReady().then(async () => {

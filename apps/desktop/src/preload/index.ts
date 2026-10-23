@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { NEXUS_IPC } from "@nexus/shared";
 
+function getIsPackaged(): boolean {
+  const arg = (process.argv as string[]).find((a) => a.startsWith("--nexus-is-packaged="));
+  if (arg) return arg.split("=")[1] === "true";
+  return false;
+}
+
+const isPackaged = getIsPackaged();
+
 const nexusApi = {
   ping: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke("nexus:ping"),
   window: {
@@ -54,13 +62,21 @@ const nexusApi = {
       return () => ipcRenderer.removeListener(NEXUS_IPC.STATE_CHANGED, handler);
     },
   },
+  dev: {
+    isPackaged,
+    onToggle: (cb: () => void): (() => void) => {
+      const handler = () => cb();
+      ipcRenderer.on(NEXUS_IPC.DEV_TOGGLE, handler);
+      return () => ipcRenderer.removeListener(NEXUS_IPC.DEV_TOGGLE, handler);
+    },
+  },
 };
 
 export type NexusApi = typeof nexusApi;
 
 try {
   contextBridge.exposeInMainWorld("nexus", nexusApi);
-  contextBridge.exposeInMainWorld("__NEXUS_IS_PACKAGED__", false);
+  contextBridge.exposeInMainWorld("__NEXUS_IS_PACKAGED__", isPackaged);
 } catch (err) {
   console.error("[preload] failed to expose nexus api", err);
 }

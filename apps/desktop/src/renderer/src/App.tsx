@@ -21,6 +21,7 @@ export default function App(): JSX.Element {
   const setEntries = useLogStore((s) => s.setEntries);
   const setState = useStateStore((s) => s.setState);
   const [devOpen, setDevOpen] = useState(false);
+  // Reliable dev flag: main decides (!app.isPackaged) and preload exposes before React renders
   const isDev = !(window as unknown as { __NEXUS_IS_PACKAGED__?: boolean }).__NEXUS_IS_PACKAGED__;
   const booted = useRef(false);
 
@@ -88,16 +89,14 @@ export default function App(): JSX.Element {
     document.documentElement.setAttribute("data-reduced", String(reduced));
   }, [reduced]);
 
+  // Reliable shortcut: main handles Ctrl+Alt+Shift+D via before-input-event (input.code === "KeyD")
+  // and sends DEV_TOGGLE; renderer just toggles. Prevents letter typing into CommandBar.
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.altKey && e.shiftKey && e.key.toLowerCase() === "d") {
-        if (!isDev) return;
-        e.preventDefault();
-        setDevOpen((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    if (!isDev) return;
+    const nexus = (window as unknown as { nexus?: { dev?: { onToggle?: (cb: () => void) => () => void } } }).nexus;
+    if (!nexus?.dev?.onToggle) return;
+    const off = nexus.dev.onToggle(() => setDevOpen((v) => !v));
+    return off;
   }, [isDev]);
 
   const panelTransition = reduced ? { duration: 0 } : { duration: 0.25 };
@@ -125,6 +124,27 @@ export default function App(): JSX.Element {
       </div>
       <CommandBar />
       <ActivityLog />
+      {isDev && (
+        <button
+          type="button"
+          data-testid="dev-button"
+          onClick={() => setDevOpen((v) => !v)}
+          style={{
+            position: "fixed",
+            bottom: 12,
+            right: 12,
+            zIndex: 60,
+            fontSize: 10,
+            padding: "4px 8px",
+            border: "1px solid var(--amber-border, #f59e0b)",
+            background: "var(--bg-panel, #0b0e12)",
+            color: "var(--amber, #f59e0b)",
+            borderRadius: 4,
+          }}
+        >
+          DEV
+        </button>
+      )}
     </div>
   );
 }
