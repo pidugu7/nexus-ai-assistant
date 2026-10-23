@@ -4,6 +4,7 @@
 export * from "./events.js";
 export * from "./tools.js";
 export * from "./csp.js";
+export * from "./ipc.js";
 
 export const NEXUS_VERSION = "0.1.0";
 export const NEXUS_CHANNELS = {

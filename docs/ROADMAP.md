@@ -1,74 +1,77 @@
 # NEXUS AI — Roadmap
 
-> No features beyond the blank secure window in foundation. This roadmap tracks phased delivery.
+> No AI/voice/3D/system data beyond what is checked. This tracks phased delivery.
 
 ---
 
-## Phase 0 — Foundation (current)
+## Phase 0 — Foundation (done)
 
 - [x] Monorepo scaffold (`apps/desktop`, `packages/shared`, `services/sidecar`)
 - [x] Electron + React + Vite + TypeScript strict
-- [x] Secure window (contextIsolation on, nodeIntegration off, CSP)
-- [x] ESLint + Prettier + Vitest + sample test
+- [x] Secure window (contextIsolation on, nodeIntegration off, sandbox on, CSP strict prod / dev-relaxed)
+- [x] ESLint + Prettier + Vitest + sample + CSP tests
 - [x] CI on `windows-latest` (install → lint → typecheck → test → build)
 - [x] Docs: `AGENTS.md`, `ARCHITECTURE.md`, `PERMISSIONS.md`, `EVENTS.md`, `ROADMAP.md`
 - [x] `.env.example`, `.gitignore`
 
 ---
 
-## Phase 1 — Engine & Tool Framework
+## Phase 1 — Application Shell & Static HUD (this phase, done)
+
+- [x] Frameless window + custom titlebar (app name, minimize/maximize-restore/close, draggable bar, non-draggable buttons, F11 fullscreen via validated IPC `nexus:window:*`)
+- [x] Kill-switch globalShortcut `Ctrl+Alt+Shift+K` (warn & continue if registration fails, emits `system.kill`)
+- [x] Five regions + log: Top status bar (`NEXUS AI` / `OFFLINE (UI ONLY)` / `NOT CONNECTED` / live clock), Left nav (8 items, keyboard + active highlight), Center `AI CORE (Phase 3)` placeholder, Right `SYSTEM STATUS` honest `—`/`None`, Bottom command bar stub + disabled mic `Voice arrives in Phase 7`, collapsible activity log (real entries: app started, hotkey, window events)
+- [x] Design tokens as CSS variables (`tokens.css`: near-black, cyan/amber/red, luminous 1px borders, glow, spacing/radius, `@fontsource/inter` + `@fontsource/jetbrains-mono` bundled — CSP `self`, no CDN) + `docs/DESIGN.md`
+- [x] Motion: Framer Motion ≤300 ms for panels/log; `Reduced effects` toggle (Settings, `localStorage` try/catch, `data-reduced` disables glow/transitions)
+- [x] Responsive: grid `200/1fr/280` → 180/240 → 160/220, min window `1100×680`, no overflow at 1366×768 & 1920×1080
+- [x] Tests: clock formatter, nav state, command submit, reduced-effects persistence, shell component test (`@testing-library/react`)
+- [x] New IPC typed in `packages/shared/src/ipc.ts` + events in `events.ts`, validated + `contextBridge` only; prod CSP stays strict (test passes); docs updated
+
+---
+
+## Phase 2 — Engine & Tool Framework (next)
 
 - Typed IPC registry + Zod-validated `nexus:tool:call` + permission gate (tiers 0–3)
-- Tool contract: `{ name, input, permission, execute, verify }` with allowlisted folders
-- SQLite integration (better-sqlite3) for event log + tool history
-- Event bus implementation (main ↔ renderer + sidecar)
-- Preload exposes full `window.nexus` typed API
-- Tests: tool validation, permission flows, verify() checks
+- Tool contract `{ name, input, permission, execute, verify }` with allowlisted folders
+- SQLite (`better-sqlite3`) for event log + tool history
+- Event bus impl (main ↔ renderer + sidecar) + `window.nexus` full API
+- Tests: validation, permission flows, `verify()` checks
 
 ---
 
-## Phase 2 — HUD / 3D Foundation
+## Phase 3 — HUD / 3D Core
 
-- React Three Fiber scene, original NEXUS visuals (no Marvel/Disney assets)
-- Ambient orb / status ring driven by real `engine:status` events
-- Theme + layout polish, window controls, tray integration
-- Performance profiling on RTX 4060 (target 60 fps idle)
-
----
-
-## Phase 3 — Voice I/O
-
-- STT (Whisper via sidecar or native) → text → engine
-- TTS + lip-sync / waveform in HUD
-- Push-to-talk + wake-word (optional)
-- Voice permission UX (mic consent)
+- React Three Fiber placeholder wiring into Center `AI CORE` frame
+- Ambient visuals driven by real `engine:status` events
+- Performance target 60 fps idle on RTX 4060
 
 ---
 
 ## Phase 4 — Local AI & Sidecar
 
-- Python sidecar (FastAPI + stdio) for LLMs (Ollama), tools, CV
-- Ollama integration: `llama3.1`, `phi3`, etc. — prompt → tool proposals
-- Prompt-injection defenses: web/file text treated as data
-- Streaming tool calls + partial rendering
+- Python sidecar (FastAPI + stdio) + Ollama (`llama3.1`) tool proposals
+- Prompt-injection defenses; streaming tool calls
 
 ---
 
-## Phase 5 — Workspace & Automation
+## Phase 5 — Voice I/O
 
-- File/workspace tooling (scoped to allowed folders)
-- Desktop automation tools (open app, clipboard, screenshots)
-- System monitoring (CPU/GPU/RAM overlays)
-- Auto-update, installer (Electron Builder for Windows)
+- STT/TTS, waveform HUD, push-to-talk, mic consent (mic button currently disabled)
+
+---
+
+## Phase 6 — Workspace & Automation
+
+- Scoped file tools, desktop automation, system monitoring (replaces `—` with real data), installer
 
 ---
 
 ## Out of Scope (never)
 
 - Marvel/Disney branding, copyrighted HUD replicas.
-- Arbitrary code execution by LLM — all actions go through registered tools.
-- Cloud-only LLM without user consent — local-first.
+- Arbitrary code exec — all via registered tools.
+- Cloud-only LLM without consent — local-first.
 
 ---
 
-*Last updated: 2026-10-22.*
+*Last updated: Phase 1 — 2026-10-22.*
