@@ -21,9 +21,9 @@ describe("HUD shell — all regions", () => {
     expect(screen.getByLabelText("Minimize")).toBeInTheDocument();
     expect(screen.getByLabelText("Close")).toBeInTheDocument();
 
-    // Top status bar
+    // Top status bar — now shows real state (IDLE etc.) + MODEL NOT CONNECTED
     expect(screen.getByTestId("statusbar")).toBeInTheDocument();
-    expect(screen.getByText("OFFLINE (UI ONLY)")).toBeInTheDocument();
+    expect(screen.getByTestId("status-state")).toBeInTheDocument();
     expect(screen.getByText("NOT CONNECTED")).toBeInTheDocument();
     expect(screen.getByTestId("clock")).toBeInTheDocument();
 
