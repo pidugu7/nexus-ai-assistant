@@ -96,6 +96,117 @@ function registerIpcHandlers() {
     const count = typeof (args as { count?: number })?.count === "number" ? (args as { count: number }).count : 200;
     return logStore.loadLast(count);
   });
+  // --- Ollama proxy (keep CSP strict, renderer uses preload) ---
+  ipcMain.handle(NEXUS_IPC.OLLAMA_LIST_MODELS, async () => {
+    try {
+      const base = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+      const res = await fetch(`${base}/api/tags`, { method: "GET" });
+      if (!res.ok) return { ok: false as const, error: `Ollama tags ${res.status} ${res.statusText}` };
+      const data = (await res.json()) as { models?: unknown };
+      return { ok: true as const, models: data.models ?? [] };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false as const, error: msg };
+    }
+  });
+
+  ipcMain.handle(NEXUS_IPC.OLLAMA_CHAT_STREAM, async (event, payload: { model: string; messages: { role: string; content: string }[]; fastMode?: boolean }) => {
+    const sender = event.sender;
+    const base = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+    const model = payload?.model || "qwen3:8b";
+    const messages = payload?.messages || [];
+    const fastMode = !!payload?.fastMode;
+    try {
+      const body: Record<string, unknown> = { model, messages, stream: true };
+      if (fastMode) {
+        // Ollama 0.40.9 supports think:false for qwen3 reasoning disable
+        body.think = false;
+      }
+      const res = await fetch(`${base}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        // Detect unsupported think option
+        if (fastMode && (text.includes("think") || res.status === 400)) {
+          sender.send(NEXUS_IPC.OLLAMA_CHAT_ERROR, { message: `Fast mode unsupported by this Ollama version: ${text || res.statusText}` });
+          return { ok: false as const, error: "Fast mode unsupported by this Ollama version" };
+        }
+        sender.send(NEXUS_IPC.OLLAMA_CHAT_ERROR, { message: `Ollama chat failed ${res.status}: ${text || res.statusText}` });
+        return { ok: false as const, error: `Ollama chat failed ${res.status}` };
+      }
+      if (!res.body) {
+        sender.send(NEXUS_IPC.OLLAMA_CHAT_ERROR, { message: "Ollama chat: no body" });
+        return { ok: false as const, error: "no body" };
+      }
+      // Stream NDJSON lines
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      (async () => {
+        try {
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            let newlineIdx: number;
+            while ((newlineIdx = buf.indexOf("\n")) !== -1) {
+              const line = buf.slice(0, newlineIdx).trim();
+              buf = buf.slice(newlineIdx + 1);
+              if (!line) continue;
+              try {
+                const chunk = JSON.parse(line) as {
+                  message?: { content?: string; thinking?: string; role?: string };
+                  thinking?: string;
+                  response?: string;
+                  done?: boolean;
+                };
+                // Normalize thinking/content from both newer (thinking field) and older (no)
+                const thinking = chunk.message?.thinking ?? chunk.thinking ?? "";
+                const content = chunk.message?.content ?? chunk.response ?? "";
+                const isDone = !!chunk.done;
+                if (!sender.isDestroyed()) {
+                  sender.send(NEXUS_IPC.OLLAMA_CHAT_CHUNK, { thinking, content, done: isDone });
+                }
+                if (isDone) {
+                  if (!sender.isDestroyed()) sender.send(NEXUS_IPC.OLLAMA_CHAT_DONE, {});
+                  return;
+                }
+              } catch {
+                // Non-JSON line — forward as content
+                if (!sender.isDestroyed()) sender.send(NEXUS_IPC.OLLAMA_CHAT_CHUNK, { thinking: "", content: line, done: false });
+              }
+            }
+          }
+          // Flush remaining buf
+          const remaining = buf.trim();
+          if (remaining) {
+            try {
+              const chunk = JSON.parse(remaining) as { message?: { content?: string; thinking?: string }; done?: boolean };
+              const thinking = chunk.message?.thinking ?? "";
+              const content = chunk.message?.content ?? "";
+              if (!sender.isDestroyed()) sender.send(NEXUS_IPC.OLLAMA_CHAT_CHUNK, { thinking, content, done: !!chunk.done });
+            } catch {
+              if (!sender.isDestroyed()) sender.send(NEXUS_IPC.OLLAMA_CHAT_CHUNK, { thinking: "", content: remaining, done: false });
+            }
+          }
+          if (!sender.isDestroyed()) sender.send(NEXUS_IPC.OLLAMA_CHAT_DONE, {});
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!sender.isDestroyed()) sender.send(NEXUS_IPC.OLLAMA_CHAT_ERROR, { message: msg });
+        }
+      })();
+      return { ok: true as const };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!sender.isDestroyed()) sender.send(NEXUS_IPC.OLLAMA_CHAT_ERROR, { message: msg });
+      return { ok: false as const, error: msg };
+    }
+  });
+
   ipcMain.handle(NEXUS_IPC.LOG_CLEAR_VIEW, async () => ({ ok: true }));
   ipcMain.handle(NEXUS_IPC.BUS_PUBLISH, async (_e, raw) => {
     const isDev = !app.isPackaged;

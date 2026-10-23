@@ -12,9 +12,9 @@ export interface QualitySettings {
 }
 
 export const QUALITY_CONFIG: Record<QualityTier, QualitySettings> = {
-  low: { particleCount: 120, bloomIntensity: 0.6, bloomRadius: 0.4, enableBloom: false, dpr: 1 },
-  medium: { particleCount: 500, bloomIntensity: 0.9, bloomRadius: 0.6, enableBloom: true, dpr: 1.1 },
-  high: { particleCount: 1100, bloomIntensity: 1.3, bloomRadius: 0.75, enableBloom: true, dpr: 1.5 },
+  low: { particleCount: 120, bloomIntensity: 0, bloomRadius: 0, enableBloom: false, dpr: 1 },
+  medium: { particleCount: 500, bloomIntensity: 1.0, bloomRadius: 0.65, enableBloom: true, dpr: 1.1 },
+  high: { particleCount: 1100, bloomIntensity: 1.55, bloomRadius: 0.82, enableBloom: true, dpr: 1.5 },
 };
 
 export function getStoredQuality(): QualityTier {

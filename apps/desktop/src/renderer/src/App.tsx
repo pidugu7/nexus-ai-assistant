@@ -8,6 +8,7 @@ import { RightPanel } from "./components/RightPanel.js";
 import { CommandBar } from "./components/CommandBar.js";
 import { ActivityLog } from "./components/ActivityLog.js";
 import { SettingsView } from "./components/SettingsView.js";
+import { ConversationPanel } from "./components/ConversationPanel.js";
 import { DevPanel } from "./components/DevPanel.js";
 import { useNavStore } from "./store/navStore.js";
 import { useSettingsStore } from "./store/settingsStore.js";
@@ -128,7 +129,14 @@ export default function App(): JSX.Element {
           <LeftNav />
         </motion.aside>
         <main className="shell-center" data-testid="shell-center">
-          {active === "Settings" ? <SettingsView /> : <CenterCore />}
+          {active === "Settings" ? (
+            <SettingsView />
+          ) : (
+            <>
+              <CenterCore />
+              <ConversationPanel />
+            </>
+          )}
           {active !== "Home" && active !== "Settings" && (
             <div className="placeholder-note text-muted" data-testid="view-placeholder">
               {active} — view reserved for future phase

@@ -24,4 +24,7 @@ export const STORAGE_KEYS = {
   REDUCED_EFFECTS: "nexus:reduced-effects",
   QUALITY: "nexus:quality",
   FPS_OVERLAY: "nexus:fps-overlay",
+  OLLAMA_MODEL: "nexus:ollama-model",
+  SHOW_REASONING: "nexus:show-reasoning",
+  FAST_MODE: "nexus:fast-mode",
 } as const;

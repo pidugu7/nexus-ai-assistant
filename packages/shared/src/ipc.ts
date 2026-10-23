@@ -21,6 +21,12 @@ export const NEXUS_IPC = {
   DEV_TOGGLE: "nexus:dev:toggle",
   FPS_TOGGLE: "nexus:fps:toggle",
   TOAST: "nexus:toast",
+  // Phase 4 — Ollama
+  OLLAMA_LIST_MODELS: "nexus:ollama:list-models",
+  OLLAMA_CHAT_STREAM: "nexus:ollama:chat-stream",
+  OLLAMA_CHAT_CHUNK: "nexus:ollama:chat-chunk",
+  OLLAMA_CHAT_DONE: "nexus:ollama:chat-done",
+  OLLAMA_CHAT_ERROR: "nexus:ollama:chat-error",
 } as const;
 
 export type NexusIpcChannel = (typeof NEXUS_IPC)[keyof typeof NEXUS_IPC];
