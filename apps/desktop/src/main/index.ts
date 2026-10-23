@@ -20,22 +20,33 @@ async function persistAndBroadcast(event: { id: string; timestamp: string; sourc
   const logEntry = { id: event.id, timestamp: event.timestamp, level, message: event.source === "simulated" ? `${message} — SIMULATED` : message, source: event.source, type: event.type, payload: event.payload };
   await logStore.append(logEntry as never);
   if (mainWindow && !mainWindow.isDestroyed()) {
+    // TRACE HOP 6
+    try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.BUS_SUBSCRIBE} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
     mainWindow.webContents.send(NEXUS_IPC.BUS_SUBSCRIBE, event);
+    try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.LOG_ENTRY} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
     mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, logEntry);
+  } else {
+    try { console.log(`[HOP 6] main: webContents.send skipped - no window or destroyed`); } catch (_e) { void _e; }
   }
   return logEntry;
 }
 
 function sendToast(message: string, ok: boolean) {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.TOAST} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
     mainWindow.webContents.send(NEXUS_IPC.TOAST, { message, ok });
+  } else {
+    try { console.log(`[HOP 6] main: webContents.send skipped for ${NEXUS_IPC.TOAST}`); } catch (_e) { void _e; }
   }
 }
 
 function handleStateTransition(event: { type: string; payload: unknown; id: string }) {
+  // TRACE HOP 5
+  try { console.log(`[HOP 5] main: state machine result start ${event.type} from=${machine.getState()}`); } catch (_e) { void _e; }
   const from = machine.getState();
   const res = machine.transition({ type: event.type, payload: event.payload });
   if (!res.ok) {
+    try { console.log(`[HOP 5] main: state machine result rejection reason ${res.reason} old=${from}`); } catch (_e) { void _e; }
     const warn = { id: `${Date.now()}-warn`, timestamp: new Date().toISOString(), source: "system" as const, type: "system.warning" as const, payload: { message: res.reason }, level: "warn" as const, message: res.reason };
     bus.publish(warn);
     persistAndBroadcast(warn as never);
@@ -43,13 +54,19 @@ function handleStateTransition(event: { type: string; payload: unknown; id: stri
     return { ok: false as const, reason: res.reason, from };
   }
   const to = res.to;
+  try { console.log(`[HOP 5] main: state machine result old state ${from}, new state ${to}`); } catch (_e) { void _e; }
   // Kill from idle should not log pointless idle->idle
   if (from === to && event.type === "system.kill") {
     persistAndBroadcast({ id: `${Date.now()}-state`, timestamp: new Date().toISOString(), source: "system", type: "log:entry", payload: {}, level: "info", message: "kill: already idle" } as never);
     sendToast("kill: already idle", true);
     return { ok: true as const, from, to };
   }
-  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(NEXUS_IPC.STATE_CHANGED, { from, to, eventId: event.id });
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.STATE_CHANGED} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
+    mainWindow.webContents.send(NEXUS_IPC.STATE_CHANGED, { from, to, eventId: event.id });
+  } else {
+    try { console.log(`[HOP 6] main: webContents.send skipped for ${NEXUS_IPC.STATE_CHANGED}`); } catch (_e) { void _e; }
+  }
   const lvl = to === "error" || to === "warning" ? "warn" : "info";
   persistAndBroadcast({ id: `${Date.now()}-state`, timestamp: new Date().toISOString(), source: "system", type: `state:${from}->${to}`, payload: {}, level: lvl, message: `state ${from} → ${to}` } as never);
   return { ok: true as const, from, to };
@@ -96,16 +113,24 @@ function registerIpcHandlers() {
   });
   ipcMain.handle(NEXUS_IPC.LOG_CLEAR_VIEW, async () => ({ ok: true }));
   ipcMain.handle(NEXUS_IPC.BUS_PUBLISH, async (_e, raw) => {
+    // TRACE HOP 3
+    try { console.log(`[HOP 3] main: the IPC handler receives it ${JSON.stringify(raw).slice(0,200)}`); } catch (_e) { void _e; }
     const isDev = !app.isPackaged;
     const parsed = NexusEventSchema.safeParse(raw);
     if (!parsed.success) {
+      // TRACE HOP 4
+      try { const r = parsed.error.issues.map((i) => i.message).join("; "); console.log(`[HOP 4] main: validation result rejected with the zod error ${r.slice(0,200)}`); } catch (_e) { void _e; }
       const reason = parsed.error.issues.map((i) => i.message).join("; ");
       const rawType = (raw as { type?: string })?.type ?? "event";
       const entry = { id: `${Date.now()}-rej`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: { reason }, level: "warn" as const, message: `${rawType}: REJECTED because ${reason}` };
       await logStore.append({ id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type, payload: entry.payload } as never);
       if (mainWindow && !mainWindow.isDestroyed()) {
+        try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.LOG_ENTRY} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
         mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+        try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.TOAST} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
         mainWindow.webContents.send(NEXUS_IPC.TOAST, { message: `${rawType}: REJECTED because ${reason}`, ok: false });
+      } else {
+        try { console.log(`[HOP 6] main: webContents.send skipped for REJECTED`); } catch (_e) { void _e; }
       }
       return { ok: false, reason };
     }
@@ -115,8 +140,12 @@ function registerIpcHandlers() {
       const entry = { id: `${Date.now()}-rej`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: { reason }, level: "warn" as const, message: `${ev.type}: REJECTED because ${reason}` };
       await logStore.append({ id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type, payload: entry.payload } as never);
       if (mainWindow && !mainWindow.isDestroyed()) {
+        try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.LOG_ENTRY} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
         mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+        try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.TOAST} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
         mainWindow.webContents.send(NEXUS_IPC.TOAST, { message: `${ev.type}: REJECTED because ${reason}`, ok: false });
+      } else {
+        try { console.log(`[HOP 6] main: webContents.send skipped for REJECTED ${ev.type}`); } catch (_e) { void _e; }
       }
       return { ok: false, reason };
     }
@@ -125,13 +154,21 @@ function registerIpcHandlers() {
       const entry = { id: `${Date.now()}-rej`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: { reason }, level: "warn" as const, message: `${ev.type}: REJECTED because ${reason}` };
       await logStore.append({ id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type, payload: entry.payload } as never);
       if (mainWindow && !mainWindow.isDestroyed()) {
+        try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.LOG_ENTRY} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
         mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+        try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.TOAST} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
         mainWindow.webContents.send(NEXUS_IPC.TOAST, { message: `${ev.type}: REJECTED because ${reason}`, ok: false });
+      } else {
+        try { console.log(`[HOP 6] main: webContents.send skipped for allowlist ${ev.type}`); } catch (_e) { void _e; }
       }
       return { ok: false, reason };
     }
+    // TRACE HOP 4 accepted so far
+    try { console.log(`[HOP 4] main: validation result accepted ${ev.type} allowlist=${RENDERER_PUBLISH_ALLOWLIST.includes(ev.type as never)}`); } catch (_e) { void _e; }
     const res = bus.publish(raw, { fromRenderer: true });
     if (!res.ok) {
+      // TRACE HOP 4 rejected by bus
+      try { console.log(`[HOP 4] main: validation result rejected with the zod error / allowlist reason ${res.reason}`); } catch (_e) { void _e; }
       const reason = res.reason;
       const entry = { id: `${Date.now()}-rej`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: { reason }, level: "warn" as const, message: `${ev.type}: REJECTED because ${reason}` };
       await logStore.append({ id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type, payload: entry.payload } as never);
@@ -146,7 +183,10 @@ function registerIpcHandlers() {
       const entry = { id: `${Date.now()}-kill-idle`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: {}, level: "info" as const, message: "kill: already idle" };
       await logStore.append({ id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type, payload: entry.payload } as never);
       if (mainWindow && !mainWindow.isDestroyed()) {
+        try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.LOG_ENTRY} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
         mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+      } else {
+        try { console.log(`[HOP 6] main: webContents.send skipped for kill idle`); } catch (_e) { void _e; }
       }
       sendToast("kill: already idle", true);
       return { ok: true };
@@ -171,8 +211,12 @@ function registerKillSwitch() {
       const entry = { id: `${Date.now()}-kill-idle`, timestamp: new Date().toISOString(), source: "system" as const, type: "log:entry" as const, payload: {}, level: "info" as const, message: "kill: already idle" };
       logStore.append(entry as never);
       if (mainWindow && !mainWindow.isDestroyed()) {
+        try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.LOG_ENTRY} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
         mainWindow.webContents.send(NEXUS_IPC.LOG_ENTRY, { id: entry.id, timestamp: entry.timestamp, level: entry.level, message: entry.message, source: entry.source, type: entry.type });
+        try { console.log(`[HOP 6] main: webContents.send is called: ${NEXUS_IPC.TOAST} windows=${BrowserWindow.getAllWindows().length} isDestroyed=${mainWindow.webContents.isDestroyed()}`); } catch (_e) { void _e; }
         mainWindow.webContents.send(NEXUS_IPC.TOAST, { message: "kill: already idle", ok: true });
+      } else {
+        try { console.log(`[HOP 6] main: webContents.send skipped for killSwitch idle`); } catch (_e) { void _e; }
       }
       return;
     }
