@@ -247,6 +247,10 @@ function createWindow() {
       event.preventDefault();
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(NEXUS_IPC.DEV_TOGGLE);
     }
+    if (input.code === "KeyF" && input.control && input.alt && input.shift && input.type === "keyDown") {
+      event.preventDefault();
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(NEXUS_IPC.FPS_TOGGLE);
+    }
   });
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url);

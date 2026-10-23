@@ -109,6 +109,13 @@ export default function App(): JSX.Element {
     return off;
   }, [isDev]);
 
+  useEffect(() => {
+    const nexus = (window as unknown as { nexus?: { fps?: { onToggle?: (cb: () => void) => () => void } } }).nexus;
+    if (!nexus?.fps?.onToggle) return;
+    const off = nexus.fps.onToggle(() => useSettingsStore.getState().toggleFpsOverlay());
+    return off;
+  }, []);
+
   const panelTransition = reduced ? { duration: 0 } : { duration: 0.25 };
 
   return (

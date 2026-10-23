@@ -19,6 +19,7 @@ export const NEXUS_IPC = {
   LOG_GET: "nexus:log:get",
   LOG_CLEAR_VIEW: "nexus:log:clear-view",
   DEV_TOGGLE: "nexus:dev:toggle",
+  FPS_TOGGLE: "nexus:fps:toggle",
   TOAST: "nexus:toast",
 } as const;
 

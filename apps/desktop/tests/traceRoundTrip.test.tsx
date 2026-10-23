@@ -160,6 +160,8 @@ describe("round trip without Electron", () => {
     });
 
     expect(useStateStore.getState().state).toBe("idle");
+    // Core fallback may log WebGL warning in jsdom – clear before asserting
+    useLogStore.setState({ entries: [], collapsed: false });
     expect(useLogStore.getState().entries.length).toBe(0);
 
     const ev = createEvent("voice.listening.started", {}, { source: "simulated" });
